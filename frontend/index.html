@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<meta charset="UTF-8">
+<title>Public Health AI Assistant</title>
+
+<link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+
+<header>
+
+<button class="menu-btn" onclick="toggleSidebar()">☰</button>
+
+<h1>🏥 Public Health AI Assistant</h1>
+
+<div class="language-selector">
+
+<select id="language">
+
+<option value="en">English</option>
+
+<option value="hi">Hindi</option>
+
+<option value="or">Odia</option>
+
+</select>
+
+</div>
+
+<p>"Ask questions about diseases, vaccines, medical reports and health care"</p>
+
+<img class="doctor-img"
+src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png">
+
+</header>
+
+<div class="main-container">
+
+<!-- Sidebar -->
+
+<div class="sidebar" id="sidebar">
+
+<h3>Chat History</h3>
+
+<ul id="history"></ul>
+
+<button class="delete-btn" onclick="clearHistory()">Delete All</button>
+
+</div>
+
+<!-- Chat Area -->
+
+<div class="chat-container">
+
+<div id="chatbox"></div>
+
+<div class="input-area">
+
+<input id="message"
+placeholder="Ask a health question..."
+onkeypress="handleKey(event)">
+
+<button onclick="sendMessage()">Send</button>
+
+</div>
+<div class="report-section">
+
+<h3>📄 Medical Report Analyzer</h3>
+
+<input type="file" id="reportFile">
+
+<button onclick="uploadReport()">Upload & Analyze</button>
+
+<button onclick="deleteReport()" style="background:red;">Delete Report</button>
+
+<div id="reportChatbox" class="chatbox"></div>
+
+<div class="input-area">
+
+<input id="reportMessage" placeholder="Ask about your report..."
+onkeypress="handleReportKey(event)">
+
+<button onclick="sendReportMessage()">Send</button>
+
+</div>
+
+</div>
+
+<p class="disclaimer">
+⚠️ For personal treatment consult with a certified doctor.
+</p>
+
+</div>
+
+<!-- Alerts -->
+
+<div class="alert-panel">
+
+<h3>⚠️ Outbreak Alerts</h3>
+
+<ul id="alerts"></ul>
+
+</div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
