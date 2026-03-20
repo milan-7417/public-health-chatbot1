@@ -1,3 +1,12 @@
+---
+title: Public Health Chatbot
+emoji: 🤖
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_file: backend/main.py
+pinned: false
+---
 # 🩺 Public Health AI Chatbot
 
 An intelligent **AI-powered Public Health Assistant** that provides medical guidance, report analysis, outbreak alerts, and multilingual conversational support using **RAG (Retrieval-Augmented Generation)** and **LLMs**.
