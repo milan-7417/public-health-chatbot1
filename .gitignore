@@ -30,3 +30,6 @@ dist/
 # Temporary files
 *.tmp
 *.temp
+
+backend/data/pdfs/
+backend/vector_db/
