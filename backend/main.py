@@ -206,40 +206,71 @@ def delete_report():
 # 📱 WHATSAPP BOT (FIXED)
 # =========================
 from fastapi.responses import Response
+from fastapi import Request, Response
+from twilio.twiml.messaging_response import MessagingResponse
+
 @app.post("/whatsapp")
 async def whatsapp_reply(request: Request):
 
-    form = await request.form()
-    incoming_msg = form.get("Body")
-
-    print("📩 Incoming:", incoming_msg)
-
-    if not incoming_msg:
-        incoming_msg = "Hello"
-
     try:
-        # 🔹 SIMPLE TEST (FIRST VERIFY)
-        answer = rag_answer(incoming_msg)
+        # 🔹 Get incoming data from Twilio
+        form = await request.form()
+        incoming_msg = form.get("Body", "").strip()
 
-        if not answer or answer.strip() == "":
-            answer = "⚠️ No response generated"
+        print("📩 Incoming:", incoming_msg)
+
+        # 🔥 Handle empty message
+        if not incoming_msg:
+            incoming_msg = "Hello"
+
+        # 🔥 BASIC SMART HANDLING (VERY IMPORTANT)
+        msg_lower = incoming_msg.lower()
+
+        if msg_lower in ["hi", "hello", "hey"]:
+            answer = (
+                "Hello 👋\n\n"
+                "I am your Public Health AI Assistant.\n"
+                "You can ask about diseases, symptoms, treatment, or reports.\n\n"
+                "Example:\n👉 What is malaria?"
+            )
+
+        elif len(incoming_msg.split()) <= 2:
+            answer = "Please ask a clear health-related question 😊"
+
+        else:
+            # 🔥 MAIN RAG CALL
+            answer = rag_answer(incoming_msg)
+
+            # 🔥 Safety fallback
+            if not answer or answer.strip() == "":
+                answer = "⚠️ I couldn't generate a response. Please try again."
+
+            # 🔥 LIMIT LENGTH (VERY IMPORTANT FOR WHATSAPP)
+            if len(answer) > 1200:
+                answer = answer[:1200] + "..."
+
+        print("📤 Reply:", answer)
+
+        # 🔥 Twilio response
+        twilio_response = MessagingResponse()
+        twilio_response.message(answer)
+
+        xml_response = str(twilio_response)
+
+        print("📦 XML Sent:", xml_response)
+
+        return Response(
+            content=xml_response,
+            media_type="application/xml"
+        )
 
     except Exception as e:
         print("❌ Error:", e)
-        answer = "⚠️ Server error"
 
-    print("📤 Reply:", answer)
+        fallback_response = MessagingResponse()
+        fallback_response.message("⚠️ Server error. Please try again later.")
 
-    # 🔥 IMPORTANT: Twilio response
-    twilio_response = MessagingResponse()
-    twilio_response.message(answer)
-
-    xml_response = str(twilio_response)
-
-    print("📦 XML Sent:", xml_response)
-
-    # 🔥 CRITICAL FIX
-    return Response(
-        content=xml_response,
-        media_type="application/xml"
-    )
+        return Response(
+            content=str(fallback_response),
+            media_type="application/xml"
+        )
