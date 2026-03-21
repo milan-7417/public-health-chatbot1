@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+import numpy as np
 from dotenv import load_dotenv
 from groq import Groq
 
@@ -34,39 +35,75 @@ def get_embedding(text):
         "Authorization": f"Bearer {HF_API_KEY}"
     }
 
-    response = requests.post(API_URL, headers=headers, json={"inputs": text})
+    try:
+        response = requests.post(API_URL, headers=headers, json={"inputs": text})
 
-    return response.json()
+        if response.status_code != 200:
+            print("HF API error:", response.text)
+            return None
+
+        result = response.json()
+
+        # FIX: extract embedding
+        if isinstance(result, list):
+            return result[0]
+        else:
+            return None
+
+    except Exception as e:
+        print("Embedding error:", e)
+        return None
+
 
 # ==============================
 # COSINE SIMILARITY
 # ==============================
-import numpy as np
-
 def cosine_similarity(a, b):
     a = np.array(a)
     b = np.array(b)
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
+
+# ==============================
+# 🔥 PRECOMPUTE DOCUMENT EMBEDDINGS
+# ==============================
+print("🔄 Generating document embeddings...")
+
+doc_embeddings = []
+
+for doc in documents:
+    emb = get_embedding(doc)
+    if emb is not None:
+        doc_embeddings.append(emb)
+    else:
+        doc_embeddings.append([0] * 384)  # fallback
+
+print("✅ Embeddings ready")
+
+
 # ==============================
 # RETRIEVE CONTEXT
 # ==============================
 def retrieve_context(query, k=3):
+
     query_embedding = get_embedding(query)
+
+    if query_embedding is None:
+        return "No context available."
 
     scores = []
 
-    for doc in documents:
-        doc_embedding = get_embedding(doc)
-        score = cosine_similarity(query_embedding, doc_embedding)
-        scores.append((score, doc))
+    for i, doc_emb in enumerate(doc_embeddings):
+        score = cosine_similarity(query_embedding, doc_emb)
+        scores.append((score, documents[i]))
 
     # sort by similarity
-    scores.sort(reverse=True)
+    scores.sort(key=lambda x: x[0], reverse=True)
 
     top_docs = [doc for _, doc in scores[:k]]
 
     return "\n".join(top_docs)
+
 
 # ==============================
 # CALL GROQ LLM
@@ -81,10 +118,12 @@ def call_llm(prompt):
 
     return response.choices[0].message.content
 
+
 # ==============================
 # MAIN RAG
 # ==============================
 def rag_answer(query, language="en"):
+
     context = retrieve_context(query)
     history = get_history()
 
@@ -94,13 +133,13 @@ You are a helpful Public Health AI assistant.
 Context:
 {context}
 
-History:
+Conversation History:
 {history}
 
-Question:
+User Question:
 {query}
 
-Answer clearly.
+Answer clearly and accurately.
 """
 
     return call_llm(prompt)
