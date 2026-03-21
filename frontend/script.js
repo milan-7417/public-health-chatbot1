@@ -137,15 +137,28 @@ let language = document.getElementById("language").value
 formData.append("file", file)
 formData.append("language", language)
 
+try{
+
 const response = await fetch("/analyze-report",{
 method:"POST",
 body:formData
 })
 
+if(!response.ok){
+throw new Error("Upload failed")
+}
+
 const data = await response.json()
 
 document.getElementById("reportChatbox").innerHTML =
 `<div class="bot"><span>${data.analysis}</span></div>`
+
+}catch(error){
+
+document.getElementById("reportChatbox").innerHTML =
+`<div class="bot"><span>⚠️ Error analyzing report</span></div>`
+
+}
 }
 
 async function sendReportMessage(){
@@ -162,16 +175,20 @@ chatbox.innerHTML +=
 
 document.getElementById("reportMessage").value=""
 
-const response = await fetch("/report-chat",{
+try{
 
+const response = await fetch("/report-chat",{
 method:"POST",
 headers:{"Content-Type":"application/json"},
 body:JSON.stringify({
 query:message,
 language:language
 })
-
 })
+
+if(!response.ok){
+throw new Error("API error")
+}
 
 const data = await response.json()
 
@@ -179,6 +196,13 @@ chatbox.innerHTML +=
 `<div class="bot"><span>${data.answer}</span></div>`
 
 chatbox.scrollTop = chatbox.scrollHeight
+
+}catch(error){
+
+chatbox.innerHTML +=
+`<div class="bot"><span>⚠️ Error</span></div>`
+
+}
 }
 
 function handleReportKey(event){
