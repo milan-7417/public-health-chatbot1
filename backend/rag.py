@@ -94,22 +94,38 @@ def call_llm(prompt):
 # =========================
 # 🔹 RAG MAIN FUNCTION (FIXED)
 # =========================
-def rag_answer(query, language="en"):   # ✅ ADDED language
+def rag_answer(query, language="en"):
 
-    # ✅ STEP 1: Translate to English for retrieval
-    if language == "hi":
-        query_en = translate(query, "hin_Deva", "eng_Latn")
-    elif language == "or":
-        query_en = translate(query, "ory_Orya", "eng_Latn")
-    else:
-        query_en = query
+    # =========================
+    # 🔹 STEP 1: TRANSLATE TO ENGLISH
+    # =========================
+    try:
+        if language == "hi":
+            query_en = translate(query, "hin_Deva", "eng_Latn")
+        elif language == "or":
+            query_en = translate(query, "ory_Orya", "eng_Latn")
+        else:
+            query_en = query
+    except:
+        query_en = query  # fallback
 
-    # ✅ STEP 2: Retrieve context
-    context = retrieve_context(query_en)
+    # =========================
+    # 🔹 STEP 2: RETRIEVE CONTEXT (LIMITED)
+    # =========================
+    context = retrieve_context(query_en, k=2)
+    context = context[:1000]   # 🔥 VERY IMPORTANT (token control)
 
-    history = get_history()
+    # =========================
+    # 🔹 STEP 3: LIMIT HISTORY
+    # =========================
+    try:
+        history = str(get_history())[-500:]   # 🔥 LIMIT HISTORY
+    except:
+        history = ""
 
-    # ✅ STEP 3: Language instruction
+    # =========================
+    # 🔹 STEP 4: LANGUAGE INSTRUCTION
+    # =========================
     if language == "hi":
         lang_instruction = "Answer in Hindi. Use simple and clear Hindi."
     elif language == "or":
@@ -117,30 +133,43 @@ def rag_answer(query, language="en"):   # ✅ ADDED language
     else:
         lang_instruction = "Answer in English."
 
+    # =========================
+    # 🔹 STEP 5: OPTIMIZED PROMPT
+    # =========================
     prompt = f"""
-You are a medical assistant.
+You are a professional medical assistant.
 
 {lang_instruction}
 
-Give a detailed and structured answer.
+Answer clearly and in structured format.
 
 Include:
 - Definition
-- Causes
 - Symptoms
 - Treatment
 - Prevention
 
-Question:
-{query_en}
+Question: {query_en}
 
-Conversation History:
-{history}
-
-Context:
-{context}
+Context: {context}
 """
 
-    answer = call_llm(prompt)
+    # =========================
+    # 🔹 STEP 6: LLM CALL
+    # =========================
+    try:
+        answer = call_llm(prompt)
+    except Exception as e:
+        print("LLM Error:", e)
+        return "⚠️ Error generating response"
+
+    # =========================
+    # 🔹 STEP 7: LIMIT RESPONSE (WHATSAPP SAFE)
+    # =========================
+    if not answer or answer.strip() == "":
+        answer = "⚠️ No response generated"
+
+    if len(answer) > 1200:
+        answer = answer[:1200] + "..."
 
     return answer
