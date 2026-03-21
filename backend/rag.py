@@ -126,20 +126,25 @@ def rag_answer(query, language="en"):
         history = get_history()
 
         prompt = f"""
-You are a helpful Public Health AI assistant.
+You are a Public Health AI Assistant.
 
-Context:
-{context}
+IMPORTANT:
+- Use conversation history to understand context
+- If the question is incomplete, refer to previous messages
 
 Conversation history:
 {history}
 
-User question:
+Relevant medical context:
+{context}
+
+Current question:
 {query}
 
-Answer clearly.
-"""
+If user asks "how to cure" or similar, assume it refers to the last discussed disease.
 
+Give clear, practical, medical advice.
+"""
         answer = call_llm(prompt)
         return answer
 
