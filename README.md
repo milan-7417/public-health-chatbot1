@@ -9,90 +9,83 @@ pinned: false
 ---
 # 🩺 Public Health AI Chatbot
 
-An intelligent **AI-powered Public Health Assistant** that provides medical guidance, report analysis, outbreak alerts, and multilingual conversational support using **RAG (Retrieval-Augmented Generation)** and **LLMs**.
+An intelligent multilingual AI-powered health assistant that provides information about diseases, medical reports, and public health alerts.
 
----
+Built using FastAPI + RAG + Local Embeddings + LLM + WhatsApp integration.
 
-## 🚀 Features
+🚀 Features
+💬 Chatbot
 
-### 💬 Smart AI Chatbot
+Ask questions about diseases, vaccines, treatments
 
-* Context-aware responses using **RAG + FAISS**
-* Powered by **Groq LLM (Llama 3.1)**
-* Maintains conversational history
+Context-aware responses using RAG
 
-### 🌍 Multilingual Support
+Maintains conversation flow
 
-* Supports **English, Hindi, Odia**
-* Real-time translation pipeline
+🌍 Multilingual Support
 
-### 📄 Medical Report Analysis
+Supports:
 
-* Upload PDF reports
-* Extract:
+English 🇬🇧
 
-  * Key findings
-  * Abnormal values
-  * Health advice
+Hindi 🇮🇳
 
-### 🦠 Outbreak Alerts
+Odia 🇮🇳
 
-* Fetches latest health alerts
-* Displays real-time disease updates
+Automatic translation (query + response)
 
-### 📱 WhatsApp Integration
+📄 Medical Report Analyzer
 
-* Chat directly via WhatsApp using **Twilio API**
+Upload PDF medical reports
 
-### 🖥️ Web Interface
+Extracts and analyzes:
 
-* Clean UI using **HTML, CSS, JavaScript**
-* Sidebar chat history
-* Alerts section
+Key findings
 
----
+Abnormal values
 
-## 🧠 Tech Stack
+Meaning
 
-### 🔹 Backend
+Health advice
 
-* FastAPI
-* FAISS (Vector Search)
-* Groq API (LLM)
-* PyPDF (Report parsing)
+Ask follow-up questions about report
 
-### 🔹 Frontend
+📢 Outbreak Alerts
 
-* HTML
-* CSS
-* JavaScript
+Live health news & outbreak alerts
 
-### 🔹 AI/ML
+Auto-refresh every 60 seconds
 
-* BAAI/bge-small-en (Embeddings)
-* RAG Architecture
+📱 WhatsApp Integration
 
-### 🔹 Deployment
+Chat with bot directly via WhatsApp
 
-* Hugging Face Spaces (Docker)
-* GitHub (Version Control)
+Works using Twilio Sandbox
 
----
+🧠 Architecture
+User → Frontend → FastAPI Backend → RAG → LLM → Response
+🔹 RAG (Retrieval Augmented Generation)
 
-## 🏗️ Project Structure
+Uses docs.json instead of vector DB
 
-```
+Embeddings generated using:
+
+BAAI/bge-small-en
+
+Retrieves top relevant context using cosine similarity
+
+📂 Project Structure
 public-health-chatbot/
 │
 ├── backend/
-│   ├── main.py
-│   ├── rag.py
-│   ├── memory.py
-│   ├── outbreak.py
-│   ├── translation.py
-│   └── vector_db/
-│       ├── faiss.index
-│       └── documents.npy
+│   ├── main.py                  # FastAPI app
+│   ├── rag.py                   # RAG logic 
+│   ├── memory.py                # Chat memory
+│   ├── outbreak.py              # Alerts API
+│   ├── translation.py           # Multilingual support
+│   ├── convert_pdf_to_json.py   # Convert PDFs → docs.json
+│   └── data/
+│       └── docs.json            # Knowledge base
 │
 ├── frontend/
 │   ├── index.html
@@ -101,144 +94,112 @@ public-health-chatbot/
 │
 ├── requirements.txt
 ├── Dockerfile
-└── README.md
-```
-
----
-
-## ⚙️ Installation (Local Setup)
-
-### 1️⃣ Clone Repository
-
-```bash
-git clone https://github.com/YOUR_USERNAME/public-health-chatbot.git
+├── README.md
+└── .env
+⚙️ Setup Instructions
+1️⃣ Clone the Repository
+git clone https://github.com/your-username/public-health-chatbot.git
 cd public-health-chatbot
-```
-
-### 2️⃣ Create Virtual Environment
-
-```bash
-python -m venv venv
-venv\Scripts\activate   # Windows
-```
-
-### 3️⃣ Install Dependencies
-
-```bash
+2️⃣ Install Dependencies
 pip install -r requirements.txt
-```
+3️⃣ Add Environment Variables
 
-### 4️⃣ Add Environment Variables
+Create .env file:
 
-Create `.env` file:
-
-```
 GROQ_API_KEY=your_groq_api_key
-HF_API_KEY=your_huggingface_api_key
-```
-
-### 5️⃣ Run Application
-
-```bash
+4️⃣ Run Locally
 uvicorn backend.main:app --reload
-```
 
 Open:
+👉 http://127.0.0.1:8000
 
-```
-http://127.0.0.1:8000
-```
+🧾 Convert PDFs to Knowledge Base
 
----
+Use this script:
 
-## ☁️ Deployment (HuggingFace Spaces)
+python backend/convert_pdf_to_json.py
 
-### Steps:
+This converts medical PDFs into:
 
-1. Create a **Docker Space**
-2. Push project files
-3. Add environment variables
-4. Auto-deploy 🚀
+backend/vector_db/docs.json
+🐳 Docker Deployment
+Build Image
+docker build -t health-chatbot .
+Run Container
+docker run -p 7860:7860 health-chatbot
+☁️ Deploy on Hugging Face Spaces
 
-Live URL:
+Create Space (SDK: Docker or FastAPI)
 
-```
-https://your-space-name.hf.space
-```
+Upload project files
 
----
+Add environment variables:
 
-## 📲 WhatsApp Integration
+GROQ_API_KEY
 
-* Uses **Twilio WhatsApp API**
-* Configure webhook:
+App will auto-deploy
 
-```
-https://your-space-name.hf.space/whatsapp
-```
+📱 WhatsApp Integration (Twilio)
+Steps:
 
----
+Go to Twilio Sandbox
 
-## 🧠 How It Works
+Join sandbox via WhatsApp
 
-1. User query → translated to English
-2. FAISS retrieves relevant context
-3. LLM generates response
-4. Response translated back
-5. Returned to user
+Set webhook:
 
----
+https://your-app-url/whatsapp
 
-## ⚡ Optimizations
+Start chatting 🚀
 
-* Lazy model loading
-* Memory-efficient FAISS usage
-* Reduced embedding size
-* Fast inference using Groq
+🔥 Tech Stack
 
----
+Backend: FastAPI
 
-## 🔮 Future Enhancements
+Frontend: HTML, CSS, JavaScript
 
-* Voice input support 🎤
-* Image-based diagnosis 📷
-* Advanced medical datasets
-* User authentication
-* Mobile app integration
+LLM: Groq (LLaMA 3)
 
----
+Embeddings: SentenceTransformers (bge-small-en)
 
-## 🤝 Contribution
+Translation: IndicTrans
 
-Contributions are welcome!
-Feel free to fork and submit PRs.
+PDF Parsing: PyPDF
 
----
+Messaging: Twilio WhatsApp API
 
-## 📄 License
+⚡ Key Highlights
 
-MIT License
+❌ No FAISS / Vector DB
 
----
+✅ Lightweight & fast (docs.json based)
 
-## 👨‍💻 Author
+✅ Multilingual AI system
 
-**Milan Kumar & Shoaib Ahmad**
+✅ Real-time health alerts
 
----
+✅ WhatsApp chatbot ready
 
-## ⭐ Acknowledgements
+⚠️ Disclaimer
 
-* Hugging Face
-* Groq
-* FastAPI
-* FAISS
-* Twilio
+This AI assistant provides general health information only.
+For medical diagnosis or treatment, consult a certified doctor.
 
----
+👨‍💻 Author
 
-## 💡 Note
+Milan Kumar
+Shoaib Ahmad
 
-> This project is for **educational purposes only** and does not replace professional medical advice.
+⭐ Future Improvements
 
----
+FAISS integration for faster retrieval
+
+Voice assistant support
+
+User authentication
+
+Personalized health tracking
+
+💡 Contribution
+
+Feel free to fork and improve this!

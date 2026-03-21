@@ -1,149 +1,109 @@
-import os
-import json
 import numpy as np
-import requests
+import json
+import os
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
 from groq import Groq
 
 from backend.memory import get_history
 
-# ==============================
-# 🔐 ENV
-# ==============================
 load_dotenv()
 
-HF_API_KEY = os.getenv("HF_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# =========================
+# 🔹 GROQ LLM SETUP
+# =========================
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-client = Groq(api_key=GROQ_API_KEY)
+# =========================
+# 🔹 LOAD DOCUMENTS
+# =========================
+with open("backend/data/docs.json", "r", encoding="utf-8") as f:
+    documents = json.load(f)
 
-# ==============================
-# 📂 LOAD DOCUMENTS (JSON)
-# ==============================
-DOC_PATH = "backend/data/docs.json"
+# =========================
+# 🔹 MODEL (LAZY LOAD)
+# =========================
+embed_model = None
 
-if os.path.exists(DOC_PATH):
-    with open(DOC_PATH, "r", encoding="utf-8") as f:
-        documents = json.load(f)
-else:
-    print("❌ docs.json not found")
-    documents = []
+def get_model():
+    global embed_model
+    if embed_model is None:
+        embed_model = SentenceTransformer("BAAI/bge-small-en")
+    return embed_model
 
-# ==============================
-# 🔥 HF EMBEDDING API
-# ==============================
-HF_URL =  "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en"
+# =========================
+# 🔹 PRECOMPUTE EMBEDDINGS (FAST 🚀)
+# =========================
+doc_embeddings = None
 
+def load_doc_embeddings():
+    global doc_embeddings
+    if doc_embeddings is None:
+        model = get_model()
+        doc_embeddings = model.encode(documents)
+    return doc_embeddings
 
-headers = {
-    "Authorization": f"Bearer {HF_API_KEY}"
-}
-
-
-def get_embedding(text):
-    try:
-        response = requests.post(
-            HF_URL,
-            headers=headers,
-            json={"inputs": [text]},
-            timeout=30
-        )
-
-        result = response.json()
-
-        if isinstance(result, dict) and "error" in result:
-            print("HF error:", result)
-            return None
-
-        return np.array(result[0], dtype="float32")
-
-    except Exception as e:
-        print("Embedding error:", e)
-        return None
-
-
-# ==============================
-# 🔍 SIMPLE RETRIEVAL (NO FAISS)
-# ==============================
+# =========================
+# 🔹 RETRIEVE CONTEXT
+# =========================
 def retrieve_context(query, k=3):
 
-    if not documents:
-        return ""
+    model = get_model()
+    doc_embeddings = load_doc_embeddings()
 
-    query_vec = get_embedding(query)
-    if query_vec is None:
-        return ""
+    query_vec = model.encode(query)
 
-    scores = []
+    # cosine similarity using dot product (fast)
+    scores = np.dot(doc_embeddings, query_vec)
 
-    for doc in documents:
-        doc_vec = get_embedding(doc)
+    top_k_idx = np.argsort(scores)[-k:]
 
-        if doc_vec is None:
-            continue
+    context = ""
+    for idx in top_k_idx:
+        context += documents[idx] + "\n"
 
-        # cosine similarity
-        score = np.dot(query_vec, doc_vec) / (
-            np.linalg.norm(query_vec) * np.linalg.norm(doc_vec)
-        )
+    return context
 
-        scores.append((score, doc))
-
-    # sort by similarity
-    scores.sort(reverse=True, key=lambda x: x[0])
-
-    top_docs = [doc for _, doc in scores[:k]]
-
-    return "\n".join(top_docs)
-
-
-# ==============================
-# 🧠 LLM
-# ==============================
+# =========================
+# 🔹 LLM CALL (GROQ)
+# =========================
 def call_llm(prompt):
 
-    try:
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant",
-            temperature=0.3,
-            max_tokens=300
-        )
+    response = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="llama-3.1-8b-instant",
+        temperature=0.3,
+        max_tokens=400
+    )
 
-        return response.choices[0].message.content
+    return response.choices[0].message.content
 
-    except Exception as e:
-        print("LLM error:", e)
-        return "⚠️ Error generating response"
+# =========================
+# 🔹 RAG MAIN FUNCTION
+# =========================
+def rag_answer(query):
 
+    context = retrieve_context(query)
 
-# ==============================
-# 🚀 RAG PIPELINE
-# ==============================
-def rag_answer(query, language="en"):
+    history = get_history()
 
-    try:
-        context = retrieve_context(query)
-        history = get_history()
+    prompt = f"""
+You are a professional medical AI assistant.
 
-        prompt = f"""
-You are a helpful Public Health AI assistant.
+Use the given context to answer the user question accurately.
+
+If answer is not in context, still give a helpful general medical answer.
 
 Context:
 {context}
 
-Conversation history:
+Conversation History:
 {history}
 
-User question:
+User Question:
 {query}
 
-Answer clearly.
+Give clear, short, and medically correct answer.
 """
 
-        answer = call_llm(prompt)
-        return answer
-
-    except Exception as e:
-        print("RAG error:", e)
-        return "⚠️ Error generating response"
+    return call_llm(prompt)
