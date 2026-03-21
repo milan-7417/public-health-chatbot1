@@ -205,6 +205,7 @@ def delete_report():
 # =========================
 # 📱 WHATSAPP BOT (FIXED)
 # =========================
+from fastapi.responses import Response
 @app.post("/whatsapp")
 async def whatsapp_reply(request: Request):
 
@@ -261,4 +262,4 @@ async def whatsapp_reply(request: Request):
     response = MessagingResponse()
     response.message(answer)
 
-     return Response(content=str(response), media_type="application/xml")
+    return Response(content=str(response), media_type="application/xml")
