@@ -10,6 +10,56 @@ from backend.memory import add_to_history, get_history
 
 from pypdf import PdfReader
 from twilio.twiml.messaging_response import MessagingResponse
+from langdetect import detect
+
+app= FastAPI()
+
+
+@app.post("/report-chat")
+def report_chat(data: dict):
+
+    query = data.get("query")
+    language = data.get("language", "en")
+
+    global uploaded_report_text
+
+    if not uploaded_report_text:
+        return {"answer": "⚠️ Please upload a medical report first."}
+
+    if not query:
+        return {"answer": "⚠️ Empty question"}
+
+    # 🔥 Language instruction
+    lang_instruction = "Answer in English"
+
+    if language == "hi":
+        lang_instruction = "Answer in Hindi"
+
+    elif language == "or":
+        lang_instruction = "Answer in Odia"
+
+    # 🔥 Prompt
+    prompt = f"""
+You are a medical assistant.
+
+Medical Report:
+{uploaded_report_text}
+
+User Question:
+{query}
+
+Give a clear and accurate answer based ONLY on the report.
+
+IMPORTANT: {lang_instruction}
+"""
+
+    try:
+        answer = call_llm(prompt)
+    except Exception as e:
+        print("Error:", e)
+        answer = "⚠️ Error generating response"
+
+    return {"answer": answer}
 
 import os
 from dotenv import load_dotenv
@@ -223,20 +273,47 @@ def delete_report():
 # =========================
 # 📱 WHATSAPP BOT (FIXED)
 # =========================
+
 @app.post("/whatsapp")
 async def whatsapp_reply(request: Request):
 
     form = await request.form()
     incoming_msg = form.get("Body")
 
+    if not incoming_msg:
+        return "No message"
+
     try:
-        # 🔥 USE RAG (context aware)
-        answer = rag_answer(incoming_msg)
+        # 🔥 Detect language
+        try:
+            lang = detect(incoming_msg)
+        except:
+            lang = "en"
+
+        query = incoming_msg
+
+        # 🔥 Translate to English (for LLM)
+        if lang == "hi":
+            query = translate(query, "hin_Deva", "eng_Latn")
+
+        elif lang == "or":
+            query = translate(query, "ory_Orya", "eng_Latn")
+
+        # 🔥 Use your RAG system
+        answer = rag_answer(query)
+
+        # 🔥 Translate back
+        if lang == "hi":
+            answer = translate(answer, "eng_Latn", "hin_Deva")
+
+        elif lang == "or":
+            answer = translate(answer, "eng_Latn", "ory_Orya")
 
     except Exception as e:
         print("Error:", e)
-        answer = "⚠️ Error processing request"
+        answer = "⚠️ Error processing your request"
 
+    # 🔥 Send reply to WhatsApp
     response = MessagingResponse()
     response.message(answer)
 
