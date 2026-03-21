@@ -106,6 +106,7 @@ async def analyze_report(file: UploadFile = File(...), language: str = "en"):
 
     global uploaded_report_text
 
+    # 🔹 Read PDF
     try:
         reader = PdfReader(file.file)
     except:
@@ -124,37 +125,40 @@ async def analyze_report(file: UploadFile = File(...), language: str = "en"):
     if not text.strip():
         return {"analysis": "⚠️ No readable text found"}
 
-    # 🔥 Store report
+    # 🔥 Store report (original)
     uploaded_report_text = text[:4000]
 
-    # 🔥 Translate report → English (if needed)
+    # 🔥 Language instruction
+    lang_instruction = "Answer in English"
+
     if language == "hi":
-        text = translate(text, "hin_Deva", "eng_Latn")
+        lang_instruction = "Answer in Hindi"
 
     elif language == "or":
-        text = translate(text, "ory_Orya", "eng_Latn")
+        lang_instruction = "Answer in Odia"
 
-    # 🔥 LLM Prompt
+    # 🔥 Prompt
     prompt = f"""
-Analyze this medical report:
+You are a professional medical expert.
+
+Analyze the following medical report carefully:
 
 {text[:2000]}
 
-Give:
-1. Key findings
-2. Abnormal values
+Provide response in structured format:
+1. Key Findings
+2. Abnormal Values
 3. What it means
-4. Health advice
+4. Health Advice
+
+IMPORTANT: {lang_instruction}
 """
 
-    answer = call_llm(prompt)
-
-    # 🔥 Translate back to user language
-    if language == "hi":
-        answer = translate(answer, "eng_Latn", "hin_Deva")
-
-    elif language == "or":
-        answer = translate(answer, "eng_Latn", "ory_Orya")
+    try:
+        answer = call_llm(prompt)
+    except Exception as e:
+        print("Error:", e)
+        answer = "⚠️ Error analyzing report"
 
     return {"analysis": answer}
 # =========================
@@ -171,15 +175,20 @@ def report_chat(data: dict):
     if not uploaded_report_text:
         return {"answer": "⚠️ Please upload a medical report first."}
 
-    try:
-        # 🔥 Translate question
-        if language == "hi":
-            query = translate(query, "hin_Deva", "eng_Latn")
+    if not query:
+        return {"answer": "⚠️ Empty question"}
 
-        elif language == "or":
-            query = translate(query, "ory_Orya", "eng_Latn")
+    # 🔥 Language instruction
+    lang_instruction = "Answer in English"
 
-        prompt = f"""
+    if language == "hi":
+        lang_instruction = "Answer in Hindi"
+
+    elif language == "or":
+        lang_instruction = "Answer in Odia"
+
+    # 🔥 Prompt
+    prompt = f"""
 You are a medical assistant.
 
 Medical Report:
@@ -188,18 +197,13 @@ Medical Report:
 User Question:
 {query}
 
-Give clear and simple answer based on report.
+Give a clear and accurate answer based ONLY on the report.
+
+IMPORTANT: {lang_instruction}
 """
 
+    try:
         answer = call_llm(prompt)
-
-        # 🔥 Translate back
-        if language == "hi":
-            answer = translate(answer, "eng_Latn", "hin_Deva")
-
-        elif language == "or":
-            answer = translate(answer, "eng_Latn", "ory_Orya")
-
     except Exception as e:
         print("Error:", e)
         answer = "⚠️ Error generating response"
