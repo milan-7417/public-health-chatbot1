@@ -15,10 +15,18 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # =========================
-# 🔹 LOAD DOCUMENTS
+# 🔹 LOAD DOCUMENTS (FIXED)
 # =========================
 with open("backend/data/docs.json", "r", encoding="utf-8") as f:
-    documents = json.load(f)
+    raw_docs = json.load(f)
+
+# ✅ Convert dict → string safely
+documents = []
+for doc in raw_docs:
+    if isinstance(doc, dict):
+        documents.append(doc.get("text", ""))
+    else:
+        documents.append(str(doc))
 
 # =========================
 # 🔹 MODEL (LAZY LOAD)
@@ -28,11 +36,12 @@ embed_model = None
 def get_model():
     global embed_model
     if embed_model is None:
+        print("Loading embedding model...")
         embed_model = SentenceTransformer("BAAI/bge-small-en")
     return embed_model
 
 # =========================
-# 🔹 PRECOMPUTE EMBEDDINGS (FAST 🚀)
+# 🔹 PRECOMPUTE EMBEDDINGS
 # =========================
 doc_embeddings = None
 
@@ -53,7 +62,7 @@ def retrieve_context(query, k=3):
 
     query_vec = model.encode(query)
 
-    # cosine similarity using dot product (fast)
+    # cosine similarity
     scores = np.dot(doc_embeddings, query_vec)
 
     top_k_idx = np.argsort(scores)[-k:]
@@ -65,29 +74,32 @@ def retrieve_context(query, k=3):
     return context
 
 # =========================
-# 🔹 LLM CALL (GROQ)
+# 🔹 LLM CALL (SAFE)
 # =========================
 def call_llm(prompt):
+    try:
+        response = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.1-8b-instant",
+            temperature=0.3,
+            max_tokens=400
+        )
+        return response.choices[0].message.content
 
-    response = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant",
-        temperature=0.3,
-        max_tokens=400
-    )
-
-    return response.choices[0].message.content
+    except Exception as e:
+        print("GROQ ERROR:", e)
+        return "⚠️ LLM error occurred"
 
 # =========================
 # 🔹 RAG MAIN FUNCTION
 # =========================
 def rag_answer(query):
 
-    context = retrieve_context(query)
+    try:
+        context = retrieve_context(query)
+        history = get_history()
 
-    history = get_history()
-
-    prompt = f"""
+        prompt = f"""
 You are a professional medical AI assistant.
 
 Use the given context to answer the user question accurately.
@@ -106,4 +118,9 @@ User Question:
 Give clear, short, and medically correct answer.
 """
 
-    return call_llm(prompt)
+        return call_llm(prompt)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return "⚠️ Error in RAG system"
