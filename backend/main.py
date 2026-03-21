@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from backend.rag import rag_answer, call_llm
 from backend.outbreak import get_outbreak_alerts
 from backend.translation import translate
+from backend.memory import add_to_history, get_history
 
 from pypdf import PdfReader
 from twilio.twiml.messaging_response import MessagingResponse
@@ -19,7 +20,9 @@ uploaded_report_text = ""
 
 app = FastAPI()
 
-# ✅ Serve frontend (IMPORTANT for HuggingFace)
+# =========================
+# ✅ STATIC FILES (HF FIX)
+# =========================
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
 @app.get("/")
@@ -27,7 +30,9 @@ def home():
     return FileResponse("frontend/index.html")
 
 
-# ✅ CORS (safe for deployment)
+# =========================
+# ✅ CORS
+# =========================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,7 +43,7 @@ app.add_middleware(
 
 
 # =========================
-# CHAT
+# 🔥 CHAT (FIXED WITH MEMORY)
 # =========================
 @app.post("/chat")
 def chat(data: dict):
@@ -52,20 +57,29 @@ def chat(data: dict):
     global uploaded_report_text
 
     try:
+        original_query = query
+
         # 🔹 Translate to English
         if language == "hi":
             query = translate(query, "hin_Deva", "eng_Latn")
-
         elif language == "or":
             query = translate(query, "ory_Orya", "eng_Latn")
 
-        # 🔹 Use RAG (IMPORTANT FIX)
+        # 🔥 CONTEXT FIX (VERY IMPORTANT)
+        history = get_history()
+
+        if len(query.split()) <= 4:
+            query = f"{query} (context: {history})"
+
+        # 🔹 RAG
         answer = rag_answer(query)
+
+        # 🔥 SAVE HISTORY (CRITICAL FIX)
+        add_to_history(original_query, answer)
 
         # 🔹 Translate back
         if language == "hi":
             answer = translate(answer, "eng_Latn", "hin_Deva")
-
         elif language == "or":
             answer = translate(answer, "eng_Latn", "ory_Orya")
 
@@ -77,7 +91,7 @@ def chat(data: dict):
 
 
 # =========================
-# ALERTS
+# 🔔 ALERTS
 # =========================
 @app.get("/alerts")
 def alerts():
@@ -85,7 +99,7 @@ def alerts():
 
 
 # =========================
-# REPORT ANALYSIS
+# 📄 REPORT ANALYSIS
 # =========================
 @app.post("/analyze-report")
 async def analyze_report(file: UploadFile = File(...)):
@@ -120,8 +134,8 @@ Analyze this medical report:
 Give:
 1. Key findings
 2. Abnormal values
-3. What it means
-4. Basic health advice
+3. Meaning
+4. Health advice
 """
 
     answer = call_llm(prompt)
@@ -130,7 +144,7 @@ Give:
 
 
 # =========================
-# REPORT CHAT
+# 📊 REPORT CHAT
 # =========================
 @app.post("/report-chat")
 def report_chat(data: dict):
@@ -144,9 +158,9 @@ def report_chat(data: dict):
         return {"answer": "⚠️ Please upload a medical report first."}
 
     try:
+        # 🔹 Translate
         if language == "hi":
             query = translate(query, "hin_Deva", "eng_Latn")
-
         elif language == "or":
             query = translate(query, "ory_Orya", "eng_Latn")
 
@@ -164,9 +178,9 @@ Answer ONLY based on report.
 
         answer = call_llm(prompt)
 
+        # 🔹 Translate back
         if language == "hi":
             answer = translate(answer, "eng_Latn", "hin_Deva")
-
         elif language == "or":
             answer = translate(answer, "eng_Latn", "ory_Orya")
 
@@ -178,7 +192,7 @@ Answer ONLY based on report.
 
 
 # =========================
-# DELETE REPORT
+# 🗑 DELETE REPORT
 # =========================
 @app.post("/delete-report")
 def delete_report():
@@ -188,7 +202,7 @@ def delete_report():
 
 
 # =========================
-# WHATSAPP BOT
+# 📱 WHATSAPP BOT (FIXED)
 # =========================
 @app.post("/whatsapp")
 async def whatsapp_reply(request: Request):
@@ -197,7 +211,7 @@ async def whatsapp_reply(request: Request):
     incoming_msg = form.get("Body")
 
     try:
-        # 🔥 Use RAG instead of raw LLM (IMPORTANT FIX)
+        # 🔥 USE RAG (context aware)
         answer = rag_answer(incoming_msg)
 
     except Exception as e:
