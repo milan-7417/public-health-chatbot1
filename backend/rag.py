@@ -15,12 +15,11 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # =========================
-# 🔹 LOAD DOCUMENTS (FIXED)
+# 🔹 LOAD DOCUMENTS
 # =========================
 with open("backend/data/docs.json", "r", encoding="utf-8") as f:
     raw_docs = json.load(f)
 
-# ✅ Convert dict → string safely
 documents = []
 for doc in raw_docs:
     if isinstance(doc, dict):
@@ -29,52 +28,45 @@ for doc in raw_docs:
         documents.append(str(doc))
 
 # =========================
-# 🔹 MODEL (LAZY LOAD)
+# 🔹 LOAD MODEL ON STARTUP (FAST)
 # =========================
-embed_model = None
-
-def get_model():
-    global embed_model
-    if embed_model is None:
-        print("Loading embedding model...")
-        embed_model = SentenceTransformer("BAAI/bge-small-en")
-    return embed_model
+print("🚀 Loading embedding model once...")
+embed_model = SentenceTransformer("BAAI/bge-small-en")
 
 # =========================
-# 🔹 PRECOMPUTE EMBEDDINGS
+# 🔹 PRECOMPUTE EMBEDDINGS (VERY FAST AFTER THIS)
 # =========================
-doc_embeddings = None
-
-def load_doc_embeddings():
-    global doc_embeddings
-    if doc_embeddings is None:
-        model = get_model()
-        doc_embeddings = model.encode(documents)
-    return doc_embeddings
+print("🚀 Computing document embeddings...")
+doc_embeddings = embed_model.encode(
+    documents,
+    convert_to_numpy=True,
+    normalize_embeddings=True
+)
 
 # =========================
-# 🔹 RETRIEVE CONTEXT
+# 🔹 RETRIEVE CONTEXT (OPTIMIZED)
 # =========================
 def retrieve_context(query, k=3):
 
-    model = get_model()
-    doc_embeddings = load_doc_embeddings()
+    query_vec = embed_model.encode(
+        query,
+        convert_to_numpy=True,
+        normalize_embeddings=True
+    )
 
-    query_vec = model.encode(query)
-
-    # cosine similarity
+    # cosine similarity (fast)
     scores = np.dot(doc_embeddings, query_vec)
 
-    top_k_idx = np.argsort(scores)[-k:]
+    # top-k
+    top_k_idx = np.argsort(scores)[-k:][::-1]
 
-    context = ""
-    for idx in top_k_idx:
-        context += documents[idx] + "\n"
+    context = "\n".join([documents[i] for i in top_k_idx])
 
     return context
 
+
 # =========================
-# 🔹 LLM CALL (SAFE)
+# 🔹 LLM CALL (FAST + CLEAN)
 # =========================
 def call_llm(prompt):
 
@@ -82,7 +74,11 @@ def call_llm(prompt):
         messages=[
             {
                 "role": "system",
-                "content": "You are a professional medical assistant. Give detailed, clear, and structured answers. Do NOT mention 'based on context' or conversation history."
+                "content": (
+                    "You are a professional medical assistant. "
+                    "Give detailed, structured answers with headings. "
+                    "Do NOT mention context or history."
+                )
             },
             {
                 "role": "user",
@@ -90,44 +86,44 @@ def call_llm(prompt):
             }
         ],
         model="llama-3.1-8b-instant",
-        temperature=0.7,
-        max_tokens=700   
+        temperature=0.5,
+        max_tokens=600
     )
 
     return response.choices[0].message.content
 
+
 # =========================
 # 🔹 RAG MAIN FUNCTION
 # =========================
-
 def rag_answer(query):
 
     context = retrieve_context(query)
     history = get_history()
 
     prompt = f"""
-You are a medical assistant.
-
-Answer the question in a detailed and structured way.
+Answer the following medical question in a clear and structured format.
 
 Include:
 - Definition
 - Causes
 - Symptoms
 - Treatment
-- Prevention (if applicable)
+- Prevention
 
-Do NOT say "based on context" or mention conversation history.
-
-Context:
-{context}
+Question:
+{query}
 
 Conversation History:
 {history}
 
-Question:
-{query}
+Context:
+{context}
 """
 
     return call_llm(prompt)
+
+
+
+
 
