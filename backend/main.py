@@ -261,4 +261,4 @@ async def whatsapp_reply(request: Request):
     response = MessagingResponse()
     response.message(answer)
 
-    return str(response)
+     return Response(content=str(response), media_type="application/xml")
