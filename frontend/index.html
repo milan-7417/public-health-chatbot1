@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <title>Public Health AI Assistant</title>
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/static/style.css">
 
 </head>
 
@@ -56,11 +56,11 @@ src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png">
 
 <div class="chat-container">
 
-<div id="chatbox"></div>
+<div id="chatbox" class="chatbox"></div>
 
 <div class="input-area">
 
-<input id="message"
+<input id="message" type="text"
 placeholder="Ask a health question..."
 onkeypress="handleKey(event)">
 
@@ -81,7 +81,8 @@ onkeypress="handleKey(event)">
 
 <div class="input-area">
 
-<input id="reportMessage" placeholder="Ask about your report..."
+<input id="reportMessage" type="text"
+ placeholder="Ask about your report..."
 onkeypress="handleReportKey(event)">
 
 <button onclick="sendReportMessage()">Send</button>
@@ -108,7 +109,7 @@ onkeypress="handleReportKey(event)">
 
 </div>
 
-<script src="script.js"></script>
+<script src="/static/script.js"></script>
 
 </body>
 </html>

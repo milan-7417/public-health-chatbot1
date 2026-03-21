@@ -87,6 +87,9 @@ language:language
 
 })
 
+if(!response.ok){
+throw new Error("API error")
+}
 const data=await response.json()
 
 chatbox.innerHTML+=
