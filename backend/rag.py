@@ -6,6 +6,7 @@ from sentence_transformers import SentenceTransformer
 from groq import Groq
 
 from backend.memory import get_history
+from backend.translation import translate   # ✅ ADDED
 
 load_dotenv()
 
@@ -34,7 +35,7 @@ print("🚀 Loading embedding model once...")
 embed_model = SentenceTransformer("BAAI/bge-small-en")
 
 # =========================
-# 🔹 PRECOMPUTE EMBEDDINGS (VERY FAST AFTER THIS)
+# 🔹 PRECOMPUTE EMBEDDINGS
 # =========================
 print("🚀 Computing document embeddings...")
 doc_embeddings = embed_model.encode(
@@ -44,7 +45,7 @@ doc_embeddings = embed_model.encode(
 )
 
 # =========================
-# 🔹 RETRIEVE CONTEXT (OPTIMIZED)
+# 🔹 RETRIEVE CONTEXT
 # =========================
 def retrieve_context(query, k=3):
 
@@ -54,10 +55,7 @@ def retrieve_context(query, k=3):
         normalize_embeddings=True
     )
 
-    # cosine similarity (fast)
     scores = np.dot(doc_embeddings, query_vec)
-
-    # top-k
     top_k_idx = np.argsort(scores)[-k:][::-1]
 
     context = "\n".join([documents[i] for i in top_k_idx])
@@ -66,7 +64,7 @@ def retrieve_context(query, k=3):
 
 
 # =========================
-# 🔹 LLM CALL (FAST + CLEAN)
+# 🔹 LLM CALL
 # =========================
 def call_llm(prompt):
 
@@ -87,22 +85,44 @@ def call_llm(prompt):
         ],
         model="llama-3.1-8b-instant",
         temperature=0.5,
-        max_tokens=600
+        max_tokens=700   # ✅ slightly increased
     )
 
     return response.choices[0].message.content
 
 
 # =========================
-# 🔹 RAG MAIN FUNCTION
+# 🔹 RAG MAIN FUNCTION (FIXED)
 # =========================
-def rag_answer(query):
+def rag_answer(query, language="en"):   # ✅ ADDED language
 
-    context = retrieve_context(query)
+    # ✅ STEP 1: Translate to English for retrieval
+    if language == "hi":
+        query_en = translate(query, "hin_Deva", "eng_Latn")
+    elif language == "or":
+        query_en = translate(query, "ory_Orya", "eng_Latn")
+    else:
+        query_en = query
+
+    # ✅ STEP 2: Retrieve context
+    context = retrieve_context(query_en)
+
     history = get_history()
 
+    # ✅ STEP 3: Language instruction
+    if language == "hi":
+        lang_instruction = "Answer in Hindi. Use simple and clear Hindi."
+    elif language == "or":
+        lang_instruction = "Answer in Odia."
+    else:
+        lang_instruction = "Answer in English."
+
     prompt = f"""
-Answer the following medical question in a clear and structured format.
+You are a medical assistant.
+
+{lang_instruction}
+
+Give a detailed and structured answer.
 
 Include:
 - Definition
@@ -112,7 +132,7 @@ Include:
 - Prevention
 
 Question:
-{query}
+{query_en}
 
 Conversation History:
 {history}
@@ -121,9 +141,6 @@ Context:
 {context}
 """
 
-    return call_llm(prompt)
+    answer = call_llm(prompt)
 
-
-
-
-
+    return answer

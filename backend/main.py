@@ -12,55 +12,6 @@ from pypdf import PdfReader
 from twilio.twiml.messaging_response import MessagingResponse
 from langdetect import detect
 
-app= FastAPI()
-
-
-@app.post("/report-chat")
-def report_chat(data: dict):
-
-    query = data.get("query")
-    language = data.get("language", "en")
-
-    global uploaded_report_text
-
-    if not uploaded_report_text:
-        return {"answer": "⚠️ Please upload a medical report first."}
-
-    if not query:
-        return {"answer": "⚠️ Empty question"}
-
-    # 🔥 Language instruction
-    lang_instruction = "Answer in English"
-
-    if language == "hi":
-        lang_instruction = "Answer in Hindi"
-
-    elif language == "or":
-        lang_instruction = "Answer in Odia"
-
-    # 🔥 Prompt
-    prompt = f"""
-You are a medical assistant.
-
-Medical Report:
-{uploaded_report_text}
-
-User Question:
-{query}
-
-Give a clear and accurate answer based ONLY on the report.
-
-IMPORTANT: {lang_instruction}
-"""
-
-    try:
-        answer = call_llm(prompt)
-    except Exception as e:
-        print("Error:", e)
-        answer = "⚠️ Error generating response"
-
-    return {"answer": answer}
-
 import os
 from dotenv import load_dotenv
 
@@ -71,7 +22,7 @@ uploaded_report_text = ""
 app = FastAPI()
 
 # =========================
-# ✅ STATIC FILES (HF FIX)
+# ✅ STATIC FILES
 # =========================
 app.mount("/static", StaticFiles(directory="frontend"), name="static")
 
@@ -93,7 +44,7 @@ app.add_middleware(
 
 
 # =========================
-# 🔥 CHAT (FIXED WITH MEMORY)
+# 🔥 CHAT (FIXED)
 # =========================
 @app.post("/chat")
 def chat(data: dict):
@@ -104,34 +55,21 @@ def chat(data: dict):
     if not query:
         return {"answer": "⚠️ Empty query"}
 
-    global uploaded_report_text
-
     try:
         original_query = query
 
-        # 🔹 Translate to English
-        if language == "hi":
-            query = translate(query, "hin_Deva", "eng_Latn")
-        elif language == "or":
-            query = translate(query, "ory_Orya", "eng_Latn")
+        # 🔥 REMOVE OLD TRANSLATION (rag.py handles it)
 
-        # 🔥 CONTEXT FIX (VERY IMPORTANT)
+        # 🔥 CONTEXT FIX
         history = get_history()
-
         if len(query.split()) <= 4:
             query = f"{query} (context: {history})"
 
-        # 🔹 RAG
-        answer = rag_answer(query)
+        # ✅ PASS LANGUAGE (IMPORTANT FIX)
+        answer = rag_answer(query, language)
 
-        # 🔥 SAVE HISTORY (CRITICAL FIX)
+        # 🔥 SAVE HISTORY
         add_to_history(original_query, answer)
-
-        # 🔹 Translate back
-        if language == "hi":
-            answer = translate(answer, "eng_Latn", "hin_Deva")
-        elif language == "or":
-            answer = translate(answer, "eng_Latn", "ory_Orya")
 
     except Exception as e:
         print("Error:", e)
@@ -156,7 +94,6 @@ async def analyze_report(file: UploadFile = File(...), language: str = "en"):
 
     global uploaded_report_text
 
-    # 🔹 Read PDF
     try:
         reader = PdfReader(file.file)
     except:
@@ -175,19 +112,15 @@ async def analyze_report(file: UploadFile = File(...), language: str = "en"):
     if not text.strip():
         return {"analysis": "⚠️ No readable text found"}
 
-    # 🔥 Store report (original)
     uploaded_report_text = text[:4000]
 
     # 🔥 Language instruction
     lang_instruction = "Answer in English"
-
     if language == "hi":
         lang_instruction = "Answer in Hindi"
-
     elif language == "or":
         lang_instruction = "Answer in Odia"
 
-    # 🔥 Prompt
     prompt = f"""
 You are a professional medical expert.
 
@@ -211,8 +144,10 @@ IMPORTANT: {lang_instruction}
         answer = "⚠️ Error analyzing report"
 
     return {"analysis": answer}
+
+
 # =========================
-# 📊 REPORT CHAT
+# 📊 REPORT CHAT (KEEP ONLY ONE)
 # =========================
 @app.post("/report-chat")
 def report_chat(data: dict):
@@ -228,16 +163,12 @@ def report_chat(data: dict):
     if not query:
         return {"answer": "⚠️ Empty question"}
 
-    # 🔥 Language instruction
     lang_instruction = "Answer in English"
-
     if language == "hi":
         lang_instruction = "Answer in Hindi"
-
     elif language == "or":
         lang_instruction = "Answer in Odia"
 
-    # 🔥 Prompt
     prompt = f"""
 You are a medical assistant.
 
@@ -260,6 +191,7 @@ IMPORTANT: {lang_instruction}
 
     return {"answer": answer}
 
+
 # =========================
 # 🗑 DELETE REPORT
 # =========================
@@ -273,7 +205,6 @@ def delete_report():
 # =========================
 # 📱 WHATSAPP BOT (FIXED)
 # =========================
-
 @app.post("/whatsapp")
 async def whatsapp_reply(request: Request):
 
@@ -284,36 +215,19 @@ async def whatsapp_reply(request: Request):
         return "No message"
 
     try:
-        # 🔥 Detect language
+        # Detect language
         try:
             lang = detect(incoming_msg)
         except:
             lang = "en"
 
-        query = incoming_msg
-
-        # 🔥 Translate to English (for LLM)
-        if lang == "hi":
-            query = translate(query, "hin_Deva", "eng_Latn")
-
-        elif lang == "or":
-            query = translate(query, "ory_Orya", "eng_Latn")
-
-        # 🔥 Use your RAG system
-        answer = rag_answer(query)
-
-        # 🔥 Translate back
-        if lang == "hi":
-            answer = translate(answer, "eng_Latn", "hin_Deva")
-
-        elif lang == "or":
-            answer = translate(answer, "eng_Latn", "ory_Orya")
+        # DIRECTLY USE RAG WITH LANGUAGE
+        answer = rag_answer(incoming_msg, lang)
 
     except Exception as e:
         print("Error:", e)
         answer = "⚠️ Error processing your request"
 
-    # 🔥 Send reply to WhatsApp
     response = MessagingResponse()
     response.message(answer)
 
