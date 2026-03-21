@@ -77,34 +77,47 @@ def retrieve_context(query, k=3):
 # 🔹 LLM CALL (SAFE)
 # =========================
 def call_llm(prompt):
-    try:
-        response = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant",
-            temperature=0.3,
-            max_tokens=400
-        )
-        return response.choices[0].message.content
 
-    except Exception as e:
-        print("GROQ ERROR:", e)
-        return "⚠️ LLM error occurred"
+    response = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": "You are a professional medical assistant. Give detailed, clear, and structured answers. Do NOT mention 'based on context' or conversation history."
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        model="llama-3.1-8b-instant",
+        temperature=0.7,
+        max_tokens=700   
+    )
+
+    return response.choices[0].message.content
 
 # =========================
 # 🔹 RAG MAIN FUNCTION
 # =========================
+
 def rag_answer(query):
 
-    try:
-        context = retrieve_context(query)
-        history = get_history()
+    context = retrieve_context(query)
+    history = get_history()
 
-        prompt = f"""
-You are a professional medical AI assistant.
+    prompt = f"""
+You are a medical assistant.
 
-Use the given context to answer the user question accurately.
+Answer the question in a detailed and structured way.
 
-If answer is not in context, still give a helpful general medical answer.
+Include:
+- Definition
+- Causes
+- Symptoms
+- Treatment
+- Prevention (if applicable)
+
+Do NOT say "based on context" or mention conversation history.
 
 Context:
 {context}
@@ -112,15 +125,9 @@ Context:
 Conversation History:
 {history}
 
-User Question:
+Question:
 {query}
-
-Give clear, short, and medically correct answer.
 """
 
-        return call_llm(prompt)
+    return call_llm(prompt)
 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return "⚠️ Error in RAG system"
