@@ -102,7 +102,7 @@ def alerts():
 # 📄 REPORT ANALYSIS
 # =========================
 @app.post("/analyze-report")
-async def analyze_report(file: UploadFile = File(...)):
+async def analyze_report(file: UploadFile = File(...), language: str = "en"):
 
     global uploaded_report_text
 
@@ -124,8 +124,17 @@ async def analyze_report(file: UploadFile = File(...)):
     if not text.strip():
         return {"analysis": "⚠️ No readable text found"}
 
+    # 🔥 Store report
     uploaded_report_text = text[:4000]
 
+    # 🔥 Translate report → English (if needed)
+    if language == "hi":
+        text = translate(text, "hin_Deva", "eng_Latn")
+
+    elif language == "or":
+        text = translate(text, "ory_Orya", "eng_Latn")
+
+    # 🔥 LLM Prompt
     prompt = f"""
 Analyze this medical report:
 
@@ -134,15 +143,20 @@ Analyze this medical report:
 Give:
 1. Key findings
 2. Abnormal values
-3. Meaning
+3. What it means
 4. Health advice
 """
 
     answer = call_llm(prompt)
 
+    # 🔥 Translate back to user language
+    if language == "hi":
+        answer = translate(answer, "eng_Latn", "hin_Deva")
+
+    elif language == "or":
+        answer = translate(answer, "eng_Latn", "ory_Orya")
+
     return {"analysis": answer}
-
-
 # =========================
 # 📊 REPORT CHAT
 # =========================
@@ -158,9 +172,10 @@ def report_chat(data: dict):
         return {"answer": "⚠️ Please upload a medical report first."}
 
     try:
-        # 🔹 Translate
+        # 🔥 Translate question
         if language == "hi":
             query = translate(query, "hin_Deva", "eng_Latn")
+
         elif language == "or":
             query = translate(query, "ory_Orya", "eng_Latn")
 
@@ -173,14 +188,15 @@ Medical Report:
 User Question:
 {query}
 
-Answer ONLY based on report.
+Give clear and simple answer based on report.
 """
 
         answer = call_llm(prompt)
 
-        # 🔹 Translate back
+        # 🔥 Translate back
         if language == "hi":
             answer = translate(answer, "eng_Latn", "hin_Deva")
+
         elif language == "or":
             answer = translate(answer, "eng_Latn", "ory_Orya")
 
@@ -189,7 +205,6 @@ Answer ONLY based on report.
         answer = "⚠️ Error generating response"
 
     return {"answer": answer}
-
 
 # =========================
 # 🗑 DELETE REPORT

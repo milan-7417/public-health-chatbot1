@@ -132,7 +132,10 @@ return
 }
 
 let formData = new FormData()
+let language = document.getElementById("language").value
+
 formData.append("file", file)
+formData.append("language", language)
 
 const response = await fetch("/analyze-report",{
 method:"POST",
