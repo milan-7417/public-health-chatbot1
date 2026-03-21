@@ -214,52 +214,32 @@ async def whatsapp_reply(request: Request):
 
     print("📩 Incoming:", incoming_msg)
 
-    # Safety check
-    if not incoming_msg or incoming_msg.strip() == "":
+    if not incoming_msg:
         incoming_msg = "Hello"
 
     try:
-        # 🔹 Detect language
-        try:
-            lang = detect(incoming_msg)
-        except:
-            lang = "en"
+        # 🔹 SIMPLE TEST (FIRST VERIFY)
+        answer = rag_answer(incoming_msg)
 
-        query = incoming_msg
-
-        # 🔹 Translate to English (for RAG)
-        if lang == "hi":
-            query = translate(query, "hin_Deva", "eng_Latn")
-
-        elif lang == "or":
-            query = translate(query, "ory_Orya", "eng_Latn")
-
-        # 🔹 Generate answer (SAFE)
-        try:
-            answer = rag_answer(query)
-        except Exception as e:
-            print("❌ RAG Error:", e)
-            answer = "Sorry, I am facing some issues. Please try again later."
-
-        # 🔹 Empty response fix
         if not answer or answer.strip() == "":
-            answer = "⚠️ I couldn't generate a response. Please try again."
-
-        # 🔹 Translate back to user language
-        if lang == "hi":
-            answer = translate(answer, "eng_Latn", "hin_Deva")
-
-        elif lang == "or":
-            answer = translate(answer, "eng_Latn", "ory_Orya")
+            answer = "⚠️ No response generated"
 
     except Exception as e:
         print("❌ Error:", e)
-        answer = "⚠️ Server error occurred"
+        answer = "⚠️ Server error"
 
     print("📤 Reply:", answer)
 
-    # 🔹 Twilio response
-    response = MessagingResponse()
-    response.message(answer)
+    # 🔥 IMPORTANT: Twilio response
+    twilio_response = MessagingResponse()
+    twilio_response.message(answer)
 
-    return Response(content=str(response), media_type="application/xml")
+    xml_response = str(twilio_response)
+
+    print("📦 XML Sent:", xml_response)
+
+    # 🔥 CRITICAL FIX
+    return Response(
+        content=xml_response,
+        media_type="application/xml"
+    )
