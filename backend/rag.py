@@ -29,7 +29,7 @@ for doc in raw_docs:
         documents.append(str(doc))
 
 # =========================
-# 🔹 LOAD MODEL ONCE (FAST)
+# 🔹 LOAD MODEL ONCE
 # =========================
 print("🚀 Loading embedding model...")
 embed_model = SentenceTransformer("BAAI/bge-small-en")
@@ -45,7 +45,7 @@ doc_embeddings = embed_model.encode(
 )
 
 # =========================
-# 🔹 RETRIEVE CONTEXT
+# 🔹 RETRIEVE CONTEXT (STRICT)
 # =========================
 def retrieve_context(query, k=2):
 
@@ -60,7 +60,7 @@ def retrieve_context(query, k=2):
 
     context = "\n".join([documents[i] for i in top_k_idx])
 
-    return context[:500]   # 🔥 limit context
+    return context[:400]   # tighter control
 
 
 # =========================
@@ -96,9 +96,10 @@ def call_llm(prompt):
                 "role": "system",
                 "content": (
                     "You are a medical assistant. "
-                    "Answer only what is asked. "
-                    "Do not repeat unnecessary information. "
-                    "Do not mention context or history."
+                    "Answer ONLY what is asked. "
+                    "Do not change disease/topic. "
+                    "Do not add unrelated diseases. "
+                    "Do not mention context/history."
                 )
             },
             {
@@ -107,20 +108,20 @@ def call_llm(prompt):
             }
         ],
         model="llama-3.1-8b-instant",
-        temperature=0.4,
-        max_tokens=400   # 🔥 safe limit
+        temperature=0.3,
+        max_tokens=450   # ✅ medium answer
     )
 
     return response.choices[0].message.content
 
 
 # =========================
-# 🔹 MAIN RAG FUNCTION
+# 🔹 MAIN FUNCTION
 # =========================
 def rag_answer(query, language="en"):
 
     # =====================
-    # 🔹 TRANSLATE TO ENGLISH
+    # 🔹 TRANSLATE INPUT
     # =====================
     try:
         if language == "hi":
@@ -133,72 +134,78 @@ def rag_answer(query, language="en"):
         query_en = query
 
     # =====================
-    # 🔹 CONTEXT AWARE FIX
+    # 🔹 GET HISTORY
     # =====================
     history = get_history()
 
+    # =====================
+    # 🔹 FOLLOW-UP FIX (IMPORTANT)
+    # =====================
     if isinstance(history, list) and len(history) > 0:
         last_q = history[-1].get("question", "")
 
+        # Only for short queries like "how to cure it"
         if len(query_en.split()) <= 4:
             query_en = f"{last_q} {query_en}"
 
     # =====================
-    # 🔹 INTENT DETECTION
+    # 🔹 INTENT
     # =====================
     intent = detect_intent(query_en)
 
     # =====================
-    # 🔹 GET CONTEXT
+    # 🔹 CONTEXT
     # =====================
     context = retrieve_context(query_en)
 
     # =====================
-    # 🔹 PROMPT BASED ON INTENT
+    # 🔹 PROMPT (SMART + CLEAN)
     # =====================
     if intent == "definition":
-        instruction = "Give a clear definition in 3-4 lines."
+        instruction = "Explain in 4-5 lines."
 
     elif intent == "symptoms":
-        instruction = "List important symptoms in bullet points."
+        instruction = "List key symptoms clearly."
 
     elif intent == "treatment":
-        instruction = "Explain treatment directly. Do not include definition."
+        instruction = "Explain treatment directly. No definition."
 
     elif intent == "prevention":
-        instruction = "Give prevention steps clearly."
+        instruction = "Give prevention steps."
 
     else:
-        instruction = "Give a helpful medical answer."
+        instruction = "Give a helpful answer."
 
     prompt = f"""
 {instruction}
 
-Question: {query_en}
+Disease/Topic: {query_en}
 
-Context: {context}
+Use ONLY this context:
+{context}
 """
 
     # =====================
     # 🔹 TOKEN SAFETY
     # =====================
-    if len(prompt) > 2000:
-        prompt = prompt[:2000]
+    if len(prompt) > 1800:
+        prompt = prompt[:1800]
 
     # =====================
-    # 🔹 CALL LLM
+    # 🔹 LLM CALL
     # =====================
     try:
         answer_en = call_llm(prompt)
     except Exception as e:
         print("LLM Error:", e)
-        return "⚠️ Please try again later"
+        return "⚠️ Please try again"
 
     # =====================
-    # 🔹 LIMIT RESPONSE SIZE
+    # 🔹 RESPONSE CONTROL (MEDIUM LENGTH)
     # =====================
-    if len(answer_en.split()) > 120:
-        answer_en = " ".join(answer_en.split()[:120])
+    words = answer_en.split()
+    if len(words) > 150:
+        answer_en = " ".join(words[:150])
 
     # =====================
     # 🔹 TRANSLATE BACK
