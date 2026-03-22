@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 from groq import Groq
 
 from backend.memory import get_history
-from backend.translation import translate   # ✅ ADDED
+from backend.translation import translate   #  ADDED
 
 load_dotenv()
 
@@ -134,7 +134,7 @@ Give:
 - Prevention
 """
 
-    # 🔥 HARD LIMIT
+    # HARD LIMIT
     if len(prompt) > 2000:
         prompt = prompt[:2000]
 
