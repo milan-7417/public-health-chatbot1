@@ -16,7 +16,7 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # =========================
-# 🔹 LOAD DOCS
+# 🔹 LOAD DOCUMENTS
 # =========================
 with open("backend/data/docs.json", "r", encoding="utf-8") as f:
     raw_docs = json.load(f)
@@ -29,12 +29,15 @@ for doc in raw_docs:
         documents.append(str(doc))
 
 # =========================
-# 🔹 MODEL LOAD
+# 🔹 LOAD MODEL ONCE (FAST)
 # =========================
-print("🚀 Loading model...")
+print("🚀 Loading embedding model...")
 embed_model = SentenceTransformer("BAAI/bge-small-en")
 
-print("🚀 Encoding docs...")
+# =========================
+# 🔹 PRECOMPUTE EMBEDDINGS
+# =========================
+print("🚀 Computing embeddings...")
 doc_embeddings = embed_model.encode(
     documents,
     convert_to_numpy=True,
@@ -55,7 +58,9 @@ def retrieve_context(query, k=2):
     scores = np.dot(doc_embeddings, query_vec)
     top_k_idx = np.argsort(scores)[-k:][::-1]
 
-    return "\n".join([documents[i] for i in top_k_idx])
+    context = "\n".join([documents[i] for i in top_k_idx])
+
+    return context[:500]   # 🔥 limit context
 
 
 # =========================
@@ -66,18 +71,22 @@ def detect_intent(query):
 
     if "what is" in q or "define" in q:
         return "definition"
+
     elif "symptom" in q:
         return "symptoms"
-    elif "treat" in q or "cure" in q:
+
+    elif "cure" in q or "treat" in q or "treatment" in q:
         return "treatment"
+
     elif "prevent" in q:
         return "prevention"
+
     else:
         return "general"
 
 
 # =========================
-# 🔹 LLM CALL
+# 🔹 LLM CALL (SAFE)
 # =========================
 def call_llm(prompt):
 
@@ -87,44 +96,32 @@ def call_llm(prompt):
                 "role": "system",
                 "content": (
                     "You are a medical assistant. "
-                    "Give correct and relevant answers only. "
-                    "Do not add unrelated diseases. "
-                    "Keep answer clean and structured."
+                    "Answer only what is asked. "
+                    "Do not repeat unnecessary information. "
+                    "Do not mention context or history."
                 )
             },
-            {"role": "user", "content": prompt}
+            {
+                "role": "user",
+                "content": prompt
+            }
         ],
         model="llama-3.1-8b-instant",
-        temperature=0.6,
-        max_tokens=500
+        temperature=0.4,
+        max_tokens=400   # 🔥 safe limit
     )
 
     return response.choices[0].message.content
 
 
 # =========================
-# 🔹 RAG MAIN FUNCTION
+# 🔹 MAIN RAG FUNCTION
 # =========================
 def rag_answer(query, language="en"):
 
-    # =========================
-    # 🔹 STEP 1: CONTEXT FIX
-    # =========================
-    try:
-        history = get_history()
-
-        if isinstance(history, list) and len(history) > 0:
-            last_q = history[-1].get("question", "")
-
-            if len(query.split()) <= 4 and "it" in query.lower():
-                query = f"{last_q} {query}"
-
-    except:
-        pass
-
-    # =========================
-    # 🔹 STEP 2: TRANSLATE TO ENGLISH
-    # =========================
+    # =====================
+    # 🔹 TRANSLATE TO ENGLISH
+    # =====================
     try:
         if language == "hi":
             query_en = translate(query, "hin_Deva", "eng_Latn")
@@ -135,38 +132,44 @@ def rag_answer(query, language="en"):
     except:
         query_en = query
 
-    # =========================
-    # 🔹 STEP 3: INTENT
-    # =========================
+    # =====================
+    # 🔹 CONTEXT AWARE FIX
+    # =====================
+    history = get_history()
+
+    if isinstance(history, list) and len(history) > 0:
+        last_q = history[-1].get("question", "")
+
+        if len(query_en.split()) <= 4:
+            query_en = f"{last_q} {query_en}"
+
+    # =====================
+    # 🔹 INTENT DETECTION
+    # =====================
     intent = detect_intent(query_en)
 
-    # =========================
-    # 🔹 STEP 4: CONTEXT
-    # =========================
+    # =====================
+    # 🔹 GET CONTEXT
+    # =====================
     context = retrieve_context(query_en)
-    context = context[:700]
 
-    # =========================
-    # 🔹 STEP 5: PROMPT
-    # =========================
+    # =====================
+    # 🔹 PROMPT BASED ON INTENT
+    # =====================
     if intent == "definition":
-        instruction = "Explain clearly in simple terms."
+        instruction = "Give a clear definition in 3-4 lines."
 
     elif intent == "symptoms":
-        instruction = "List symptoms with short explanation."
+        instruction = "List important symptoms in bullet points."
 
     elif intent == "treatment":
-        instruction = "Explain treatment and cure in detail"
+        instruction = "Explain treatment directly. Do not include definition."
 
     elif intent == "prevention":
         instruction = "Give prevention steps clearly."
 
     else:
-        instruction = """Give a structured answer:
-- Definition
-- Symptoms
-- Treatment
-- Prevention"""
+        instruction = "Give a helpful medical answer."
 
     prompt = f"""
 {instruction}
@@ -176,34 +179,42 @@ Question: {query_en}
 Context: {context}
 """
 
-    if len(prompt) > 2500:
-        prompt = prompt[:2500]
+    # =====================
+    # 🔹 TOKEN SAFETY
+    # =====================
+    if len(prompt) > 2000:
+        prompt = prompt[:2000]
 
-    # =========================
-    # 🔹 STEP 6: LLM CALL
-    # =========================
+    # =====================
+    # 🔹 CALL LLM
+    # =====================
     try:
         answer_en = call_llm(prompt)
     except Exception as e:
-        print("Error:", e)
-        return "⚠️ Please try again"
+        print("LLM Error:", e)
+        return "⚠️ Please try again later"
 
-    # =========================
-    # 🔹 STEP 7: TRANSLATE BACK
-    # =========================
+    # =====================
+    # 🔹 LIMIT RESPONSE SIZE
+    # =====================
+    if len(answer_en.split()) > 120:
+        answer_en = " ".join(answer_en.split()[:120])
+
+    # =====================
+    # 🔹 TRANSLATE BACK
+    # =====================
     try:
         if language == "hi":
             answer = translate(answer_en, "eng_Latn", "hin_Deva")
+            answer = answer.replace("मैं एक चिकित्सा सहायक हूँ", "")
+
         elif language == "or":
             answer = translate(answer_en, "eng_Latn", "ory_Orya")
+
         else:
             answer = answer_en
+
     except:
         answer = answer_en
-
-    # =========================
-    # 🔹 CLEAN OUTPUT
-    # =========================
-    answer = answer.replace("**", "").replace("#", "").strip()
 
     return answer
