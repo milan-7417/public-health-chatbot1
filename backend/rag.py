@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 from groq import Groq
 
 from backend.memory import get_history
-from backend.translation import translate   #  ADDED
+from backend.translation import translate
 
 load_dotenv()
 
@@ -29,15 +29,12 @@ for doc in raw_docs:
         documents.append(str(doc))
 
 # =========================
-# 🔹 LOAD MODEL ON STARTUP (FAST)
+# 🔹 LOAD MODEL
 # =========================
-print("🚀 Loading embedding model once...")
+print("🚀 Loading embedding model...")
 embed_model = SentenceTransformer("BAAI/bge-small-en")
 
-# =========================
-# 🔹 PRECOMPUTE EMBEDDINGS
-# =========================
-print("🚀 Computing document embeddings...")
+print("🚀 Computing embeddings...")
 doc_embeddings = embed_model.encode(
     documents,
     convert_to_numpy=True,
@@ -47,7 +44,7 @@ doc_embeddings = embed_model.encode(
 # =========================
 # 🔹 RETRIEVE CONTEXT
 # =========================
-def retrieve_context(query, k=3):
+def retrieve_context(query, k=2):
 
     query_vec = embed_model.encode(
         query,
@@ -58,13 +55,33 @@ def retrieve_context(query, k=3):
     scores = np.dot(doc_embeddings, query_vec)
     top_k_idx = np.argsort(scores)[-k:][::-1]
 
-    context = "\n".join([documents[i] for i in top_k_idx])
-
-    return context
+    return "\n".join([documents[i] for i in top_k_idx])
 
 
 # =========================
-# 🔹 LLM CALL
+# 🔹 DETECT USER INTENT 
+# =========================
+def detect_intent(query):
+    q = query.lower()
+
+    if any(word in q for word in ["what is", "define", "meaning"]):
+        return "definition"
+
+    elif any(word in q for word in ["symptom", "sign"]):
+        return "symptoms"
+
+    elif any(word in q for word in ["treat", "cure", "medicine"]):
+        return "treatment"
+
+    elif any(word in q for word in ["prevent", "precaution"]):
+        return "prevention"
+
+    else:
+        return "general"
+
+
+# =========================
+# 🔹 LLM CALL (OPTIMIZED)
 # =========================
 def call_llm(prompt):
 
@@ -72,11 +89,7 @@ def call_llm(prompt):
         messages=[
             {
                 "role": "system",
-                "content": (
-                    "You are a professional medical assistant. "
-                    "Give detailed, structured answers with headings. "
-                    "Do NOT mention context or history."
-                )
+                "content": "You are a medical assistant. Give direct and relevant answers only."
             },
             {
                 "role": "user",
@@ -85,18 +98,28 @@ def call_llm(prompt):
         ],
         model="llama-3.1-8b-instant",
         temperature=0.5,
-        max_tokens=700   # ✅ slightly increased
+        max_tokens=250
     )
 
     return response.choices[0].message.content
 
 
 # =========================
-# 🔹 RAG MAIN FUNCTION (FIXED)
+# 🔹 RAG MAIN FUNCTION
 # =========================
 def rag_answer(query, language="en"):
 
-    # 🔹 Translate
+    # 🔹 CONTEXT FIX (FOLLOW-UP)
+    try:
+        history = get_history()
+        if isinstance(history, list) and len(history) > 0:
+            last_q = history[-1].get("question", "")
+            if len(query.split()) <= 4:
+                query = f"{last_q} {query}"
+    except:
+        pass
+
+    # 🔹 TRANSLATE
     try:
         if language == "hi":
             query_en = translate(query, "hin_Deva", "eng_Latn")
@@ -107,11 +130,14 @@ def rag_answer(query, language="en"):
     except:
         query_en = query
 
-    # 🔹 Context (LIMITED)
-    context = retrieve_context(query_en, k=2)
-    context = context[:600]
+    # 🔹 DETECT INTENT 
+    intent = detect_intent(query_en)
 
-    # 🔹 Language
+    # 🔹 CONTEXT
+    context = retrieve_context(query_en)
+    context = context[:500]
+
+    # 🔹 LANGUAGE
     if language == "hi":
         lang_instruction = "Answer in Hindi."
     elif language == "or":
@@ -119,32 +145,50 @@ def rag_answer(query, language="en"):
     else:
         lang_instruction = "Answer in English."
 
-    # 🔹 SHORT PROMPT
+    # =========================
+    #  SMART PROMPT BASED ON INTENT
+    # =========================
+    if intent == "definition":
+        instruction = "Give only a clear definition."
+
+    elif intent == "symptoms":
+        instruction = "List only symptoms clearly."
+
+    elif intent == "treatment":
+        instruction = "Give only treatment and cure."
+
+    elif intent == "prevention":
+        instruction = "Give only prevention steps."
+
+    else:
+        instruction = """Give:
+- Definition
+- Symptoms
+- Treatment
+- Prevention"""
+
     prompt = f"""
 {lang_instruction}
+
+{instruction}
 
 Question: {query_en}
 
 Context: {context}
-
-Give:
-- Definition
-- Symptoms
-- Treatment
-- Prevention
 """
 
-    # HARD LIMIT
-    if len(prompt) > 2000:
-        prompt = prompt[:2000]
+    #  LIMIT PROMPT
+    if len(prompt) > 1800:
+        prompt = prompt[:1800]
 
     try:
         answer = call_llm(prompt)
     except Exception as e:
         print("LLM Error:", e)
-        return "⚠️ Please try again"
+        return "⚠️ Try again"
 
-    if len(answer) > 1000:
-        answer = answer[:1000]
+    #  LIMIT OUTPUT (WhatsApp safe)
+    if len(answer) > 900:
+        answer = answer[:900]
 
     return answer
