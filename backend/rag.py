@@ -31,10 +31,10 @@ for doc in raw_docs:
 # =========================
 # 🔹 MODEL LOAD
 # =========================
-print("🚀 Loading embedding model...")
+print("🚀 Loading model...")
 embed_model = SentenceTransformer("BAAI/bge-small-en")
 
-print("🚀 Encoding documents...")
+print("🚀 Encoding docs...")
 doc_embeddings = embed_model.encode(
     documents,
     convert_to_numpy=True,
@@ -42,7 +42,7 @@ doc_embeddings = embed_model.encode(
 )
 
 # =========================
-# 🔹 RETRIEVAL
+# 🔹 RETRIEVE CONTEXT
 # =========================
 def retrieve_context(query, k=2):
 
@@ -64,24 +64,20 @@ def retrieve_context(query, k=2):
 def detect_intent(query):
     q = query.lower()
 
-    if any(x in q for x in ["what is", "define", "meaning"]):
+    if "what is" in q or "define" in q:
         return "definition"
-
-    elif any(x in q for x in ["symptom", "sign"]):
+    elif "symptom" in q:
         return "symptoms"
-
-    elif any(x in q for x in ["treat", "cure", "medicine"]):
+    elif "treat" in q or "cure" in q:
         return "treatment"
-
-    elif any(x in q for x in ["prevent", "precaution"]):
+    elif "prevent" in q:
         return "prevention"
-
     else:
         return "general"
 
 
 # =========================
-# 🔹 LLM CALL (BALANCED)
+# 🔹 LLM CALL (CLEAN OUTPUT)
 # =========================
 def call_llm(prompt):
 
@@ -91,15 +87,17 @@ def call_llm(prompt):
                 "role": "system",
                 "content": (
                     "You are a medical assistant. "
-                    "Give accurate, relevant and moderately detailed answers. "
-                    "Avoid unnecessary repetition."
+                    "Give accurate answers. "
+                    "Do not use random symbols. "
+                    "Do not generate irrelevant diseases. "
+                    "Keep answer clean and readable."
                 )
             },
             {"role": "user", "content": prompt}
         ],
         model="llama-3.1-8b-instant",
-        temperature=0.6,
-        max_tokens=400   # ✅ balanced (no token error + good detail)
+        temperature=0.5,
+        max_tokens=350
     )
 
     return response.choices[0].message.content
@@ -110,104 +108,80 @@ def call_llm(prompt):
 # =========================
 def rag_answer(query, language="en"):
 
-    # =========================
-    # 🔹 STEP 1: CONTEXT FIX 
-    # =========================
+    # 🔹 CONTEXT MEMORY FIX
     try:
         history = get_history()
 
         if isinstance(history, list) and len(history) > 0:
             last_q = history[-1].get("question", "")
 
-            # If short query → attach context
             if len(query.split()) <= 4:
                 query = f"{last_q} {query}"
 
     except:
         pass
 
-    # =========================
-    # 🔹 STEP 2: TRANSLATE
-    # =========================
+    # 🔹 TRANSLATION FIX (SAFE)
     try:
         if language == "hi":
             query_en = translate(query, "hin_Deva", "eng_Latn")
-        elif language == "or":
-            query_en = translate(query, "ory_Orya", "eng_Latn")
         else:
             query_en = query
     except:
         query_en = query
 
-    # =========================
-    # 🔹 STEP 3: INTENT
-    # =========================
+    # 🔹 INTENT
     intent = detect_intent(query_en)
 
-    # =========================
-    # 🔹 STEP 4: RETRIEVE CONTEXT
-    # =========================
-    context = retrieve_context(query_en, k=2)
-    context = context[:700]   # ✅ controlled
+    # 🔹 CONTEXT
+    context = retrieve_context(query_en)
+    context = context[:600]
 
-    # =========================
-    # 🔹 STEP 5: LANGUAGE
-    # =========================
+    # 🔹 LANGUAGE CONTROL
     if language == "hi":
-        lang_instruction = "Answer in Hindi."
-    elif language == "or":
-        lang_instruction = "Answer in Odia."
+        lang_instruction = "Answer in simple Hindi."
     else:
         lang_instruction = "Answer in English."
 
-    # =========================
-    #  STEP 6: SMART PROMPT
-    # =========================
+    #  SMART PROMPT
     if intent == "definition":
-        instruction = "Give a clear definition with 2-3 lines explanation."
+        instruction = "Give only definition in 2-3 lines."
 
     elif intent == "symptoms":
-        instruction = "List important symptoms with short explanation."
+        instruction = "List only symptoms."
 
     elif intent == "treatment":
-        instruction = "Explain treatment and cure clearly."
+        instruction = "Give treatment only."
 
     elif intent == "prevention":
-        instruction = "Give prevention steps clearly."
+        instruction = "Give prevention steps."
 
     else:
-        instruction = """Give a structured answer:
-- Definition
-- Symptoms
-- Treatment
-- Prevention"""
+        instruction = "Give short structured answer."
 
     prompt = f"""
 {lang_instruction}
 
 {instruction}
 
-Question: {query_en}
+Disease or Topic: {query_en}
 
 Context: {context}
 """
 
-    # =========================
-    #  SAFETY LIMIT (NO TOKEN ERROR)
-    # =========================
-    if len(prompt) > 2500:
-        prompt = prompt[:2500]
+    #  LIMIT PROMPT
+    if len(prompt) > 2000:
+        prompt = prompt[:2000]
 
     try:
         answer = call_llm(prompt)
     except Exception as e:
-        print("LLM Error:", e)
-        return "⚠️ Please try again later"
+        print("Error:", e)
+        return "⚠️ Try again"
 
-    # =========================
-    #  OUTPUT CONTROL
-    # =========================
-    if len(answer) > 1200:
-        answer = answer[:1200]
+    #  CLEAN OUTPUT (REMOVE GARBAGE)
+    answer = answer.replace("**", "")
+    answer = answer.replace("#", "")
+    answer = answer.strip()
 
     return answer
