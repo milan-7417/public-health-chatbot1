@@ -77,7 +77,7 @@ def detect_intent(query):
 
 
 # =========================
-# 🔹 LLM CALL (CLEAN OUTPUT)
+# 🔹 LLM CALL
 # =========================
 def call_llm(prompt):
 
@@ -87,17 +87,16 @@ def call_llm(prompt):
                 "role": "system",
                 "content": (
                     "You are a medical assistant. "
-                    "Give accurate answers. "
-                    "Do not use random symbols. "
-                    "Do not generate irrelevant diseases. "
-                    "Keep answer clean and readable."
+                    "Give correct and relevant answers only. "
+                    "Do not add unrelated diseases. "
+                    "Keep answer clean and structured."
                 )
             },
             {"role": "user", "content": prompt}
         ],
         model="llama-3.1-8b-instant",
-        temperature=0.5,
-        max_tokens=350
+        temperature=0.6,
+        max_tokens=500
     )
 
     return response.choices[0].message.content
@@ -108,80 +107,103 @@ def call_llm(prompt):
 # =========================
 def rag_answer(query, language="en"):
 
-    # 🔹 CONTEXT MEMORY FIX
+    # =========================
+    # 🔹 STEP 1: CONTEXT FIX
+    # =========================
     try:
         history = get_history()
 
         if isinstance(history, list) and len(history) > 0:
             last_q = history[-1].get("question", "")
 
-            if len(query.split()) <= 4:
+            if len(query.split()) <= 4 and "it" in query.lower():
                 query = f"{last_q} {query}"
 
     except:
         pass
 
-    # 🔹 TRANSLATION FIX (SAFE)
+    # =========================
+    # 🔹 STEP 2: TRANSLATE TO ENGLISH
+    # =========================
     try:
         if language == "hi":
             query_en = translate(query, "hin_Deva", "eng_Latn")
+        elif language == "or":
+            query_en = translate(query, "ory_Orya", "eng_Latn")
         else:
             query_en = query
     except:
         query_en = query
 
-    # 🔹 INTENT
+    # =========================
+    # 🔹 STEP 3: INTENT
+    # =========================
     intent = detect_intent(query_en)
 
-    # 🔹 CONTEXT
+    # =========================
+    # 🔹 STEP 4: CONTEXT
+    # =========================
     context = retrieve_context(query_en)
-    context = context[:600]
+    context = context[:700]
 
-    # 🔹 LANGUAGE CONTROL
-    if language == "hi":
-        lang_instruction = "Answer in simple Hindi."
-    else:
-        lang_instruction = "Answer in English."
-
-    #  SMART PROMPT
+    # =========================
+    # 🔹 STEP 5: PROMPT
+    # =========================
     if intent == "definition":
-        instruction = "Give only definition in 2-3 lines."
+        instruction = "Explain clearly in 4-5 lines."
 
     elif intent == "symptoms":
-        instruction = "List only symptoms."
+        instruction = "List symptoms with short explanation."
 
     elif intent == "treatment":
-        instruction = "Give treatment only."
+        instruction = "Explain treatment and cure in 5-6 lines."
 
     elif intent == "prevention":
-        instruction = "Give prevention steps."
+        instruction = "Give prevention steps clearly."
 
     else:
-        instruction = "Give short structured answer."
+        instruction = """Give a structured answer:
+- Definition
+- Symptoms
+- Treatment
+- Prevention"""
 
     prompt = f"""
-{lang_instruction}
-
 {instruction}
 
-Disease or Topic: {query_en}
+Question: {query_en}
 
 Context: {context}
 """
 
-    #  LIMIT PROMPT
-    if len(prompt) > 2000:
-        prompt = prompt[:2000]
+    if len(prompt) > 2500:
+        prompt = prompt[:2500]
 
+    # =========================
+    # 🔹 STEP 6: LLM CALL
+    # =========================
     try:
-        answer = call_llm(prompt)
+        answer_en = call_llm(prompt)
     except Exception as e:
         print("Error:", e)
-        return "⚠️ Try again"
+        return "⚠️ Please try again"
 
-    #  CLEAN OUTPUT (REMOVE GARBAGE)
-    answer = answer.replace("**", "")
-    answer = answer.replace("#", "")
-    answer = answer.strip()
+    # =========================
+    # 🔹 STEP 7: TRANSLATE BACK
+    # =========================
+    try:
+        if language == "hi":
+            answer = translate(answer_en, "eng_Latn", "hin_Deva")
+        elif language == "or":
+            answer = translate(answer_en, "eng_Latn", "ory_Orya")
+        else:
+            answer = answer_en
+    except:
+        answer = answer_en
+
+    # =========================
+    # 🔹 CLEAN OUTPUT
+    # =========================
+    answer = answer.replace("**", "").replace("#", "").strip()
 
     return answer
