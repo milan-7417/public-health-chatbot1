@@ -150,13 +150,13 @@ def rag_answer(query, language="en"):
     # 🔹 STEP 5: PROMPT
     # =========================
     if intent == "definition":
-        instruction = "Explain clearly in 4-5 lines."
+        instruction = "Explain clearly."
 
     elif intent == "symptoms":
         instruction = "List symptoms with short explanation."
 
     elif intent == "treatment":
-        instruction = "Explain treatment and cure in 5-6 lines."
+        instruction = "Explain treatment and cure."
 
     elif intent == "prevention":
         instruction = "Give prevention steps clearly."
