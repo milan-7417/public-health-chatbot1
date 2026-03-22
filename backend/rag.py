@@ -109,7 +109,7 @@ def call_llm(prompt):
         ],
         model="llama-3.1-8b-instant",
         temperature=0.3,
-        max_tokens=450   # ✅ medium answer
+        max_tokens=550   # ✅ medium answer
     )
 
     return response.choices[0].message.content
@@ -204,8 +204,8 @@ Use ONLY this context:
     # 🔹 RESPONSE CONTROL (MEDIUM LENGTH)
     # =====================
     words = answer_en.split()
-    if len(words) > 150:
-        answer_en = " ".join(words[:150])
+    if len(words) > 220:
+        answer_en = " ".join(words[:220])
 
     # =====================
     # 🔹 TRANSLATE BACK
