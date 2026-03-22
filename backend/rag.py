@@ -108,8 +108,8 @@ def call_llm(prompt):
             }
         ],
         model="llama-3.1-8b-instant",
-        temperature=0.3,
-        max_tokens=550   # ✅ medium answer
+        temperature=0.4,
+        max_tokens=600  # ✅ medium answer
     )
 
     return response.choices[0].message.content
