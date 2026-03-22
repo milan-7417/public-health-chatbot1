@@ -96,9 +96,7 @@ def call_llm(prompt):
 # =========================
 def rag_answer(query, language="en"):
 
-    # =========================
-    # 🔹 STEP 1: TRANSLATE TO ENGLISH
-    # =========================
+    # 🔹 Translate
     try:
         if language == "hi":
             query_en = translate(query, "hin_Deva", "eng_Latn")
@@ -107,69 +105,46 @@ def rag_answer(query, language="en"):
         else:
             query_en = query
     except:
-        query_en = query  # fallback
+        query_en = query
 
-    # =========================
-    # 🔹 STEP 2: RETRIEVE CONTEXT (LIMITED)
-    # =========================
+    # 🔹 Context (LIMITED)
     context = retrieve_context(query_en, k=2)
-    context = context[:1000]   # 🔥 VERY IMPORTANT (token control)
+    context = context[:600]
 
-    # =========================
-    # 🔹 STEP 3: LIMIT HISTORY
-    # =========================
-    try:
-        history = str(get_history())[-500:]   # 🔥 LIMIT HISTORY
-    except:
-        history = ""
-
-    # =========================
-    # 🔹 STEP 4: LANGUAGE INSTRUCTION
-    # =========================
+    # 🔹 Language
     if language == "hi":
-        lang_instruction = "Answer in Hindi. Use simple and clear Hindi."
+        lang_instruction = "Answer in Hindi."
     elif language == "or":
         lang_instruction = "Answer in Odia."
     else:
         lang_instruction = "Answer in English."
 
-    # =========================
-    # 🔹 STEP 5: OPTIMIZED PROMPT
-    # =========================
+    # 🔹 SHORT PROMPT
     prompt = f"""
-You are a professional medical assistant.
-
 {lang_instruction}
-
-Answer clearly and in structured format.
-
-Include:
-- Definition
-- Symptoms
-- Treatment
-- Prevention
 
 Question: {query_en}
 
 Context: {context}
+
+Give:
+- Definition
+- Symptoms
+- Treatment
+- Prevention
 """
 
-    # =========================
-    # 🔹 STEP 6: LLM CALL
-    # =========================
+    # 🔥 HARD LIMIT
+    if len(prompt) > 2000:
+        prompt = prompt[:2000]
+
     try:
         answer = call_llm(prompt)
     except Exception as e:
         print("LLM Error:", e)
-        return "⚠️ Error generating response"
+        return "⚠️ Please try again"
 
-    # =========================
-    # 🔹 STEP 7: LIMIT RESPONSE (WHATSAPP SAFE)
-    # =========================
-    if not answer or answer.strip() == "":
-        answer = "⚠️ No response generated"
-
-    if len(answer) > 1200:
-        answer = answer[:1200] + "..."
+    if len(answer) > 1000:
+        answer = answer[:1000]
 
     return answer
