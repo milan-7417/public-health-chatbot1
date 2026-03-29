@@ -44,7 +44,7 @@ app.add_middleware(
 
 
 # =========================
-# 🔥 CHAT (FIXED)
+# CHAT 
 # =========================
 @app.post("/chat")
 def chat(data: dict):
@@ -58,9 +58,9 @@ def chat(data: dict):
     try:
         original_query = query
 
-        # 🔥 REMOVE OLD TRANSLATION (rag.py handles it)
+        
 
-        # 🔥 CONTEXT FIX
+        #  CONTEXT 
         history = get_history()
         if len(query.split()) <= 4:
             query = f"{query} (context: {history})"
@@ -68,7 +68,7 @@ def chat(data: dict):
         # ✅ PASS LANGUAGE (IMPORTANT FIX)
         answer = rag_answer(query, language)
 
-        # 🔥 SAVE HISTORY
+        # SAVE HISTORY
         add_to_history(original_query, answer)
 
     except Exception as e:
@@ -114,7 +114,7 @@ async def analyze_report(file: UploadFile = File(...), language: str = "en"):
 
     uploaded_report_text = text[:4000]
 
-    # 🔥 Language instruction
+    #  Language instruction
     lang_instruction = "Answer in English"
     if language == "hi":
         lang_instruction = "Answer in Hindi"
@@ -219,11 +219,11 @@ async def whatsapp_reply(request: Request):
 
         print("📩 Incoming:", incoming_msg)
 
-        # 🔥 Handle empty message
+        #  Handle empty message
         if not incoming_msg:
             incoming_msg = "Hello"
 
-        # 🔥 BASIC SMART HANDLING (VERY IMPORTANT)
+        #  BASIC SMART HANDLING (VERY IMPORTANT)
         msg_lower = incoming_msg.lower()
 
         if msg_lower in ["hi", "hello", "hey"]:
@@ -238,20 +238,20 @@ async def whatsapp_reply(request: Request):
             answer = "Please ask a clear health-related question 😊"
 
         else:
-            # 🔥 MAIN RAG CALL
+            #  MAIN RAG CALL
             answer = rag_answer(incoming_msg)
 
-            # 🔥 Safety fallback
+            #  Safety fallback
             if not answer or answer.strip() == "":
                 answer = "⚠️ I couldn't generate a response. Please try again."
 
-            # 🔥 LIMIT LENGTH (VERY IMPORTANT FOR WHATSAPP)
+            #  LIMIT LENGTH (VERY IMPORTANT FOR WHATSAPP)
             if len(answer) > 1200:
                 answer = answer[:1200] + "..."
 
         print("📤 Reply:", answer)
 
-        # 🔥 Twilio response
+        # Twilio response
         twilio_response = MessagingResponse()
         twilio_response.message(answer)
 
