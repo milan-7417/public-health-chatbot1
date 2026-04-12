@@ -1,6 +1,7 @@
 import numpy as np
 import json
 import os
+import re
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from groq import Groq
@@ -29,13 +30,13 @@ for doc in raw_docs:
         documents.append(str(doc))
 
 # =========================
-# 🔹 LOAD MODEL ONCE
+# 🔹 LOAD MODEL
 # =========================
 print("🚀 Loading embedding model...")
 embed_model = SentenceTransformer("BAAI/bge-small-en")
 
 # =========================
-# 🔹 PRECOMPUTE EMBEDDINGS
+# 🔹 EMBEDDINGS
 # =========================
 print("🚀 Computing embeddings...")
 doc_embeddings = embed_model.encode(
@@ -45,9 +46,29 @@ doc_embeddings = embed_model.encode(
 )
 
 # =========================
-# 🔹 RETRIEVE CONTEXT (STRICT)
+# 🔹 EXTRACT DISEASE
 # =========================
-def retrieve_context(query, k=2):
+def extract_disease(text):
+    text = text.lower()
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+
+    stopwords = [
+        "what", "is", "how", "to", "cure", "treat", "it",
+        "the", "a", "an", "of", "and", "for"
+    ]
+
+    words = text.split()
+
+    for word in words:
+        if word not in stopwords and len(word) > 3:
+            return word
+
+    return ""
+
+# =========================
+# 🔹 RETRIEVE CONTEXT (SMART)
+# =========================
+def retrieve_context(query, k=3):
 
     query_vec = embed_model.encode(
         query,
@@ -56,12 +77,24 @@ def retrieve_context(query, k=2):
     )
 
     scores = np.dot(doc_embeddings, query_vec)
-    top_k_idx = np.argsort(scores)[-k:][::-1]
+
+    # 🔥 Disease-based filtering
+    disease = extract_disease(query)
+
+    filtered_idx = [
+        i for i in range(len(documents))
+        if disease and disease in documents[i].lower()
+    ]
+
+    if filtered_idx:
+        ranked = sorted(filtered_idx, key=lambda i: scores[i], reverse=True)
+        top_k_idx = ranked[:k]
+    else:
+        top_k_idx = np.argsort(scores)[-k:][::-1]
 
     context = "\n".join([documents[i] for i in top_k_idx])
 
-    return context[:400]   # tighter control
-
+    return context[:500]
 
 # =========================
 # 🔹 INTENT DETECTION
@@ -84,9 +117,8 @@ def detect_intent(query):
     else:
         return "general"
 
-
 # =========================
-# 🔹 LLM CALL (SAFE)
+# 🔹 LLM CALL
 # =========================
 def call_llm(prompt):
 
@@ -97,9 +129,9 @@ def call_llm(prompt):
                 "content": (
                     "You are a medical assistant. "
                     "Answer ONLY what is asked. "
-                    "Do not change disease/topic. "
-                    "Do not add unrelated diseases. "
-                    "Do not mention context/history."
+                    "STRICTLY stay on the given disease. "
+                    "Do not mix diseases. "
+                    "Do not hallucinate."
                 )
             },
             {
@@ -108,21 +140,18 @@ def call_llm(prompt):
             }
         ],
         model="llama-3.1-8b-instant",
-        temperature=0.4,
-        max_tokens=600  # ✅ medium answer
+        temperature=0.3,
+        max_tokens=500
     )
 
     return response.choices[0].message.content
-
 
 # =========================
 # 🔹 MAIN FUNCTION
 # =========================
 def rag_answer(query, language="en"):
 
-    # =====================
-    # 🔹 TRANSLATE INPUT
-    # =====================
+    # 🔹 TRANSLATE
     try:
         if language == "hi":
             query_en = translate(query, "hin_Deva", "eng_Latn")
@@ -133,20 +162,30 @@ def rag_answer(query, language="en"):
     except:
         query_en = query
 
-    # =====================
-    # 🔹 GET HISTORY
-    # =====================
     history = get_history()
 
     # =====================
-    # 🔹 FOLLOW-UP FIX (IMPORTANT)
+    # 🔥 FOLLOW-UP FIX (STRONG)
     # =====================
     if isinstance(history, list) and len(history) > 0:
         last_q = history[-1].get("question", "")
+        last_disease = extract_disease(last_q)
 
-        # Only for short queries like "how to cure it"
-        if len(query_en.split()) <= 4:
-            query_en = f"{last_q} {query_en}"
+        # Detect "it"
+        if re.search(r"\bit\b", query_en.lower()):
+
+            if last_disease:
+                # Replace "it" with disease
+                query_en = re.sub(
+                    r"\bit\b",
+                    last_disease,
+                    query_en,
+                    flags=re.IGNORECASE
+                )
+
+        # For short vague queries
+        elif len(query_en.split()) <= 4 and last_disease:
+            query_en = f"{last_disease} {query_en}"
 
     # =====================
     # 🔹 INTENT
@@ -159,41 +198,37 @@ def rag_answer(query, language="en"):
     context = retrieve_context(query_en)
 
     # =====================
-    # 🔹 PROMPT (SMART + CLEAN)
+    # 🔹 PROMPT
     # =====================
     if intent == "definition":
-        instruction = "Explain in 4-5 lines."
+        instruction = "Explain clearly in 4-5 lines."
 
     elif intent == "symptoms":
-        instruction = "List key symptoms clearly."
+        instruction = "List symptoms clearly."
 
     elif intent == "treatment":
-        instruction = "Explain treatment directly. No definition."
+        instruction = "Give treatment steps only."
 
     elif intent == "prevention":
         instruction = "Give prevention steps."
 
     else:
-        instruction = "Give a helpful answer."
+        instruction = "Give helpful medical answer."
 
     prompt = f"""
 {instruction}
 
-Disease/Topic: {query_en}
+Disease: {extract_disease(query_en)}
+
+Question: {query_en}
 
 Use ONLY this context:
 {context}
 """
 
-    # =====================
-    # 🔹 TOKEN SAFETY
-    # =====================
     if len(prompt) > 1800:
         prompt = prompt[:1800]
 
-    # =====================
-    # 🔹 LLM CALL
-    # =====================
     try:
         answer_en = call_llm(prompt)
     except Exception as e:
@@ -201,11 +236,11 @@ Use ONLY this context:
         return "⚠️ Please try again"
 
     # =====================
-    # 🔹 RESPONSE CONTROL (MEDIUM LENGTH)
+    # 🔹 RESPONSE LIMIT
     # =====================
     words = answer_en.split()
-    if len(words) > 220:
-        answer_en = " ".join(words[:220])
+    if len(words) > 200:
+        answer_en = " ".join(words[:200])
 
     # =====================
     # 🔹 TRANSLATE BACK
@@ -213,14 +248,10 @@ Use ONLY this context:
     try:
         if language == "hi":
             answer = translate(answer_en, "eng_Latn", "hin_Deva")
-            answer = answer.replace("मैं एक चिकित्सा सहायक हूँ", "")
-
         elif language == "or":
             answer = translate(answer_en, "eng_Latn", "ory_Orya")
-
         else:
             answer = answer_en
-
     except:
         answer = answer_en
 
