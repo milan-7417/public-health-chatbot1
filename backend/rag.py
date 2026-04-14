@@ -2,6 +2,7 @@ import numpy as np
 import json
 import os
 import re
+import sys
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from groq import Groq
@@ -12,6 +13,14 @@ from backend.translation import translate
 load_dotenv()
 
 # =========================
+# 🔹 PATH FIX (FOR EXE)
+# =========================
+def resource_path(relative_path):
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+# =========================
 # 🔹 GROQ SETUP
 # =========================
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -19,7 +28,7 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 # =========================
 # 🔹 LOAD DOCUMENTS
 # =========================
-with open("backend/data/docs.json", "r", encoding="utf-8") as f:
+with open(resource_path("backend/data/docs.json"), "r", encoding="utf-8") as f:
     raw_docs = json.load(f)
 
 documents = []
@@ -30,20 +39,16 @@ for doc in raw_docs:
         documents.append(str(doc))
 
 # =========================
-# 🔹 LOAD MODEL
+# 🔹 LOAD MODEL (ONLY FOR QUERY)
 # =========================
 print("🚀 Loading embedding model...")
-embed_model = SentenceTransformer("BAAI/bge-small-en")
+embed_model = SentenceTransformer("all-MiniLM-L6-v2")  # 🔥 faster model
 
 # =========================
-# 🔹 EMBEDDINGS
+# 🔹 LOAD PRECOMPUTED EMBEDDINGS (FAST)
 # =========================
-print("🚀 Computing embeddings...")
-doc_embeddings = embed_model.encode(
-    documents,
-    convert_to_numpy=True,
-    normalize_embeddings=True
-)
+print("⚡ Loading precomputed embeddings...")
+doc_embeddings = np.load(resource_path("backend/data/embeddings.npy"))
 
 # =========================
 # 🔹 EXTRACT DISEASE
@@ -78,7 +83,6 @@ def retrieve_context(query, k=3):
 
     scores = np.dot(doc_embeddings, query_vec)
 
-    # 🔥 Disease-based filtering
     disease = extract_disease(query)
 
     filtered_idx = [
@@ -104,16 +108,12 @@ def detect_intent(query):
 
     if "what is" in q or "define" in q:
         return "definition"
-
     elif "symptom" in q:
         return "symptoms"
-
     elif "cure" in q or "treat" in q or "treatment" in q:
         return "treatment"
-
     elif "prevent" in q:
         return "prevention"
-
     else:
         return "general"
 
@@ -165,17 +165,14 @@ def rag_answer(query, language="en"):
     history = get_history()
 
     # =====================
-    # 🔥 FOLLOW-UP FIX (STRONG)
+    # 🔥 FOLLOW-UP FIX
     # =====================
     if isinstance(history, list) and len(history) > 0:
         last_q = history[-1].get("question", "")
         last_disease = extract_disease(last_q)
 
-        # Detect "it"
         if re.search(r"\bit\b", query_en.lower()):
-
             if last_disease:
-                # Replace "it" with disease
                 query_en = re.sub(
                     r"\bit\b",
                     last_disease,
@@ -183,7 +180,6 @@ def rag_answer(query, language="en"):
                     flags=re.IGNORECASE
                 )
 
-        # For short vague queries
         elif len(query_en.split()) <= 4 and last_disease:
             query_en = f"{last_disease} {query_en}"
 
@@ -202,16 +198,12 @@ def rag_answer(query, language="en"):
     # =====================
     if intent == "definition":
         instruction = "Explain clearly in 4-5 lines."
-
     elif intent == "symptoms":
         instruction = "List symptoms clearly."
-
     elif intent == "treatment":
         instruction = "Give treatment steps only."
-
     elif intent == "prevention":
         instruction = "Give prevention steps."
-
     else:
         instruction = "Give helpful medical answer."
 
