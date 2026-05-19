@@ -8,6 +8,15 @@ from backend.outbreak import get_outbreak_alerts
 from backend.translation import translate
 from backend.memory import add_to_history, get_history
 
+import sys
+
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 from pypdf import PdfReader
 from twilio.twiml.messaging_response import MessagingResponse
 from langdetect import detect
@@ -25,11 +34,13 @@ app = FastAPI()
 # =========================
 # ✅ STATIC FILES
 # =========================
-app.mount("/static", StaticFiles(directory="frontend"), name="static")
+frontend_path = resource_path("frontend")
+
+app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 
 @app.get("/")
 def home():
-    return FileResponse("frontend/index.html")
+    return FileResponse(os.path.join(frontend_path, "index.html"))
 
 # =========================
 # ✅ CORS

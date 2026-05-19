@@ -26,29 +26,42 @@ def resource_path(relative_path):
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # =========================
-# 🔹 LOAD DOCUMENTS
+# 🔹 GLOBAL LAZY VARIABLES
 # =========================
-with open(resource_path("backend/data/docs.json"), "r", encoding="utf-8") as f:
-    raw_docs = json.load(f)
-
-documents = []
-for doc in raw_docs:
-    if isinstance(doc, dict):
-        documents.append(doc.get("text", ""))
-    else:
-        documents.append(str(doc))
+embed_model = None
+doc_embeddings = None
+documents = None
 
 # =========================
-# 🔹 LOAD MODEL (ONLY FOR QUERY)
+# 🔹 LOAD RESOURCES (LAZY)
 # =========================
-print("🚀 Loading embedding model...")
-embed_model = SentenceTransformer("all-MiniLM-L6-v2")  # 🔥 faster model
+def load_resources():
+    global embed_model, doc_embeddings, documents
 
-# =========================
-# 🔹 LOAD PRECOMPUTED EMBEDDINGS (FAST)
-# =========================
-print("⚡ Loading precomputed embeddings...")
-doc_embeddings = np.load(resource_path("backend/data/embeddings.npy"))
+    # 🔹 Load documents
+    if documents is None:
+        print("📄 Loading documents...")
+        with open(resource_path("backend/data/docs.json"), "r", encoding="utf-8") as f:
+            raw_docs = json.load(f)
+
+        documents_list = []
+        for doc in raw_docs:
+            if isinstance(doc, dict):
+                documents_list.append(doc.get("text", ""))
+            else:
+                documents_list.append(str(doc))
+
+        documents = documents_list
+
+    # 🔹 Load embedding model
+    if embed_model is None:
+        print("🚀 Loading embedding model...")
+        embed_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+    # 🔹 Load embeddings
+    if doc_embeddings is None:
+        print("⚡ Loading precomputed embeddings...")
+        doc_embeddings = np.load(resource_path("backend/data/embeddings.npy"))
 
 # =========================
 # 🔹 EXTRACT DISEASE
@@ -74,6 +87,8 @@ def extract_disease(text):
 # 🔹 RETRIEVE CONTEXT (SMART)
 # =========================
 def retrieve_context(query, k=3):
+
+    load_resources()   # ✅ LAZY LOAD HERE
 
     query_vec = embed_model.encode(
         query,
@@ -165,7 +180,6 @@ def rag_answer(query, language="en"):
     history = get_history()
 
     # =====================
-    # 🔥 FOLLOW-UP FIX
     # =====================
     if isinstance(history, list) and len(history) > 0:
         last_q = history[-1].get("question", "")

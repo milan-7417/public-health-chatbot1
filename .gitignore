@@ -34,4 +34,3 @@ dist/
 backend/data/pdfs/
 backend/vector_db/
 
-create_embeddings.py

@@ -29,7 +29,7 @@ def get_history():
 
 
 # =========================
-# 🔹 GET FORMATTED HISTORY (OPTIONAL for UI)
+# 🔹 GET FORMATTED HISTORY 
 # =========================
 def get_history_text():
 
