@@ -1,205 +1,279 @@
+# 🩺 AI-Driven Public Health Chatbot for Disease Awareness
+
+<p align="center">
+
+![Python](https://img.shields.io/badge/Python-3.10-blue?style=for-the-badge&logo=python)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![HTML](https://img.shields.io/badge/HTML-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS](https://img.shields.io/badge/CSS-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black)
+![Groq](https://img.shields.io/badge/Groq-000000?style=for-the-badge)
+![Llama3](https://img.shields.io/badge/Llama%203-8B-orange?style=for-the-badge)
+![RAG](https://img.shields.io/badge/RAG-Retrieval--Augmented-blueviolet?style=for-the-badge)
+
+</p>
+
 ---
-title: Public Health Chatbot
-emoji: 🤖
-colorFrom: blue
-colorTo: green
-sdk: docker
-app_file: backend/main.py
-pinned: false
+
+## 📌 Project Overview
+
+**AI-Driven Public Health Chatbot for Disease Awareness** is an intelligent healthcare assistant that provides reliable disease-related information using **Retrieval-Augmented Generation (RAG)** and **Large Language Models (LLMs)**.
+
+The chatbot retrieves relevant medical knowledge from trusted healthcare documents before generating responses, resulting in more accurate and context-aware answers.
+
+Apart from answering health-related questions, the system also supports:
+
+- 🩺 Disease Awareness
+- 📄 Medical Report Analysis
+- 🌍 Multilingual Communication
+- 💬 WhatsApp Bot Integration
+- 🧠 Context-Aware Conversations
+
 ---
-# 🩺 Public Health AI Chatbot
 
-An intelligent multilingual AI-powered health assistant that provides information about diseases, medical reports, and public health alerts.
+# ✨ Key Features
 
-Built using FastAPI + RAG + Local Embeddings + LLM + WhatsApp integration.
+### 🤖 AI-Powered Healthcare Chatbot
 
-🚀 Features
-💬 Chatbot
+- Retrieval-Augmented Generation (RAG)
+- Context-aware responses
+- Multi-turn conversation
+- Medical knowledge retrieval
 
-Ask questions about diseases, vaccines, treatments
+---
 
-Context-aware responses using RAG
+### 📄 Medical Report Analyzer
 
-Maintains conversation flow
+- Upload PDF medical reports
+- Automatic report analysis
+- Key findings extraction
+- Health recommendations
+- Easy-to-understand explanations
 
-🌍 Multilingual Support
+---
+
+### 🌍 Multilingual Support
 
 Supports:
 
-English 🇬🇧
+- English
+- Hindi
+- Odia
 
-Hindi 🇮🇳
+using **NLLB-200-distilled-600M** translation model.
 
-Odia 🇮🇳
+---
 
-Automatic translation (query + response)
+### 💬 WhatsApp Integration
 
-📄 Medical Report Analyzer
+Users can communicate with the chatbot directly through WhatsApp using **Twilio API**, making healthcare assistance available on mobile devices.
 
-Upload PDF medical reports
+---
 
-Extracts and analyzes:
+### ⚡ Fast Response Generation
 
-Key findings
+Powered by
 
-Abnormal values
+- Groq API
+- Llama 3-8B
+- Precomputed Embeddings
 
-Meaning
+for low-latency inference.
 
-Health advice
+---
 
-Ask follow-up questions about report
+# 🏗️ System Architecture
 
-📢 Outbreak Alerts
+```
+User
+   │
+   ▼
+Frontend (HTML/CSS/JavaScript)
+   │
+   ▼
+FastAPI Backend
+   │
+   ├──────── Translation Module
+   │
+   ├──────── Memory Module
+   │
+   ├──────── RAG Pipeline
+   │
+   ├──────── Medical Report Analyzer
+   │
+   └──────── WhatsApp Bot
+                │
+                ▼
+          Groq Llama-3-8B
+                │
+                ▼
+         AI Generated Response
+```
 
-Live health news & outbreak alerts
+---
 
-Auto-refresh every 60 seconds
+# 🧠 RAG Workflow
 
-📱 WhatsApp Integration
+```
+User Query
+      │
+      ▼
+Embedding Generation
+      │
+      ▼
+Similarity Search
+      │
+      ▼
+Retrieve Relevant Context
+      │
+      ▼
+Prompt Construction
+      │
+      ▼
+Groq Llama-3-8B
+      │
+      ▼
+Final Response
+```
 
-Chat with bot directly via WhatsApp
+---
 
-Works using Twilio Sandbox
+# 🛠️ Tech Stack
 
-🧠 Architecture
-User → Frontend → FastAPI Backend → RAG → LLM → Response
-🔹 RAG (Retrieval Augmented Generation)
+| Category | Technologies |
+|-----------|--------------|
+| Backend | FastAPI |
+| Frontend | HTML, CSS, JavaScript |
+| Language | Python |
+| LLM | Llama 3-8B (Groq) |
+| Translation | NLLB-200-distilled-600M |
+| Embeddings | Sentence Transformers |
+| Retrieval | NumPy Embeddings |
+| Dataset | WHO & MoHFW Healthcare Documents |
+| PDF Processing | PyPDF |
+| Messaging | Twilio WhatsApp API |
+| Deployment | Hugging Face Spaces |
 
-Uses docs.json instead of vector DB
+---
 
-Embeddings generated using:
+# 📂 Project Structure
 
-BAAI/bge-small-en
+```
+AI-Driven-Public-Health-Chatbot/
 
-Retrieves top relevant context using cosine similarity
-
-📂 Project Structure
-public-health-chatbot/
 │
 ├── backend/
-│   ├── main.py                  # FastAPI app
-│   ├── rag.py                   # RAG logic 
-│   ├── memory.py                # Chat memory
-│   ├── outbreak.py              # Alerts API
-│   ├── translation.py           # Multilingual support
-│   ├── convert_pdf_to_json.py   # Convert PDFs → docs.json
+│   ├── main.py
+│   ├── rag.py
+│   ├── memory.py
+│   ├── translation.py
+│   ├── outbreak.py
 │   └── data/
-│       └── docs.json            # Knowledge base
 │
 ├── frontend/
 │   ├── index.html
-│   ├── script.js
-│   └── style.css
+│   ├── style.css
+│   └── script.js
 │
+├── create_embeddings.py
+├── embeddings.npy
+├── run.py
 ├── requirements.txt
 ├── Dockerfile
-├── README.md
-└── .env
-⚙️ Setup Instructions
-1️⃣ Clone the Repository
-git clone https://github.com/your-username/public-health-chatbot.git
-cd public-health-chatbot
-2️⃣ Install Dependencies
+└── README.md
+```
+
+---
+
+# 📷 Screenshots
+
+## 🖥️ Web Chatbot Interface
+
+![Web Chatbot](assets/chatbot-interface.png)
+
+---
+
+## 📄 Medical Report Analyzer
+
+![Medical Report Analyzer](assets/report-analyzer.png)
+
+---
+
+## 💬 Twilio WhatsApp Bot
+
+![WhatsApp Bot](assets/whatsapp-bot.png)
+
+---
+
+# 🚀 Installation
+
+Clone repository
+
+```bash
+git clone https://github.com/yourusername/AI-Driven-Public-Health-Chatbot.git
+
+cd AI-Driven-Public-Health-Chatbot
+```
+
+Install dependencies
+
+```bash
 pip install -r requirements.txt
-3️⃣ Add Environment Variables
+```
 
-Create .env file:
+Create embeddings
 
-GROQ_API_KEY=your_groq_api_key
-4️⃣ Run Locally
-uvicorn backend.main:app --reload
+```bash
+python create_embeddings.py
+```
 
-Open:
-👉 http://127.0.0.1:8000
+Run project
 
-🧾 Convert PDFs to Knowledge Base
+```bash
+python run.py
+```
 
-Use this script:
+Open
 
-python backend/convert_pdf_to_json.py
+```
+http://127.0.0.1:8000
+```
 
-This converts medical PDFs into:
+---
 
-backend/vector_db/docs.json
-🐳 Docker Deployment
-Build Image
-docker build -t health-chatbot .
-Run Container
-docker run -p 7860:7860 health-chatbot
-☁️ Deploy on Hugging Face Spaces
+# 📊 Dataset
 
-Create Space (SDK: Docker or FastAPI)
+The chatbot uses curated healthcare documents collected from trusted public health organizations including:
 
-Upload project files
+- World Health Organization (WHO)
+- Ministry of Health & Family Welfare (MoHFW)
+- Disease Awareness PDFs
+- Public Health Guidelines
 
-Add environment variables:
+These documents are converted into JSON format and embedded for semantic retrieval.
 
-GROQ_API_KEY
+---
 
-App will auto-deploy
+# 🎯 Future Improvements
 
-📱 WhatsApp Integration (Twilio)
-Steps:
+- Voice-based interaction
+- Mobile application
+- Electronic Health Record (EHR) integration
+- Real-time disease surveillance
+- Personalized healthcare recommendations
+- Advanced diagnostic support
 
-Go to Twilio Sandbox
+---
 
-Join sandbox via WhatsApp
+# 👨‍💻 Author
 
-Set webhook:
+**Milan Kumar**
 
-https://your-app-url/whatsapp
+B.Tech Computer Science & Engineering (AI & ML)
 
-Start chatting 🚀
+- GitHub: https://github.com/milan-7417
+- LinkedIn: https://linkedin.com/in/milan-kumar-14167a30b
 
-🔥 Tech Stack
+---
 
-Backend: FastAPI
-
-Frontend: HTML, CSS, JavaScript
-
-LLM: Groq (LLaMA 3)
-
-Embeddings: SentenceTransformers (bge-small-en)
-
-Translation: IndicTrans
-
-PDF Parsing: PyPDF
-
-Messaging: Twilio WhatsApp API
-
-⚡ Key Highlights
-
-❌ No FAISS / Vector DB
-
-✅ Lightweight & fast (docs.json based)
-
-✅ Multilingual AI system
-
-✅ Real-time health alerts
-
-✅ WhatsApp chatbot ready
-
-⚠️ Disclaimer
-
-This AI assistant provides general health information only.
-For medical diagnosis or treatment, consult a certified doctor.
-
-👨‍💻 Author
-
-Milan Kumar
-Shoaib Ahmad
-
-⭐ Future Improvements
-
-FAISS integration for faster retrieval
-
-Voice assistant support
-
-User authentication
-
-Personalized health tracking
-
-💡 Contribution
-
-Feel free to fork and improve this!
+# ⭐ If you found this project useful, don't forget to star the repository.
